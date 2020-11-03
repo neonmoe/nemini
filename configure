@@ -1,0 +1,19 @@
+#!/bin/sh
+rm Makefile
+echo "OUTDIR=./build-linux-$(uname -m)" >> Makefile
+echo "EXE=nemini" >> Makefile
+echo "OBJS=src/main.o" >> Makefile
+echo "CFLAGS=-Os $(sdl2-config --cflags)" >> Makefile
+echo "LIBS=$(sdl2-config --libs)" >> Makefile
+echo "OUTFLAG=-o" >> Makefile
+echo "DIRSEP=/" >> Makefile
+
+# These are defined so that windows builds can call them what they want
+echo "RMFILE=rm -f" >> Makefile
+echo "RMDIR=rmdir" >> Makefile
+echo "MKDIR=mkdir -p" >> Makefile
+
+# This is not in Makefile.in because nmake does not skip the .POSIX target
+echo ".POSIX:" >> Makefile
+
+cat Makefile.in >> Makefile
