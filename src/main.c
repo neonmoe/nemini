@@ -1,18 +1,24 @@
 #include <SDL.h>
 #include "ctx.h"
 
-int get_refresh_rate(SDL_Window*);
+int get_refresh_rate(SDL_Window *);
+bool get_scale(SDL_Window *, SDL_Renderer *, float *, float *);
 
 int main(int argc, char *argv[]) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't initialize SDL: %s", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Couldn't initialize SDL: %s",
+                     SDL_GetError());
         return 1;
     }
 
     SDL_Window *window;
     SDL_Renderer *renderer;
-    if (SDL_CreateWindowAndRenderer(320, 240, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window and renderer: %s", SDL_GetError());
+    Uint32 flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+    if (SDL_CreateWindowAndRenderer(320, 240, flags, &window, &renderer)) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Couldn't create window and renderer: %s",
+                     SDL_GetError());
         return 1;
     }
 
@@ -31,6 +37,11 @@ int main(int argc, char *argv[]) {
         }
         if (!running) {
             break;
+        }
+
+        float scaleX, scaleY;
+        if (get_scale(window, renderer, &scaleX, &scaleY)) {
+            SDL_RenderSetScale(renderer, scaleX, scaleY);
         }
 
         SDL_SetRenderDrawColor(renderer, 0x22, 0x44, 0x22, 0xFF);
@@ -57,6 +68,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
+// Returns refresh rate on success, -1 on error.
 int get_refresh_rate(SDL_Window *window) {
     int displayIndex = SDL_GetWindowDisplayIndex(window);
     if (displayIndex >= 0) {
@@ -68,4 +80,17 @@ int get_refresh_rate(SDL_Window *window) {
         }
     }
     return -1;
+}
+
+// Returns true on success, scaleX and scaleY are filled.
+bool get_scale(SDL_Window *window, SDL_Renderer *renderer, float *scaleX, float *scaleY) {
+    int logicalWidth, logicalHeight;
+    SDL_GetWindowSize(window, &logicalWidth, &logicalHeight);
+    int physicalWidth, physicalHeight;
+    if (SDL_GetRendererOutputSize(renderer, &physicalWidth, &physicalHeight)) {
+        return false;
+    }
+    *scaleX = (float) physicalWidth / (float) logicalWidth;
+    *scaleY = (float) physicalHeight / (float) logicalHeight;
+    return true;
 }
