@@ -1,10 +1,21 @@
 #include <SDL.h>
+
 #include "ctx.h"
+#include "net.h"
+#include "error.h"
 
 int get_refresh_rate(SDL_Window *);
 bool get_scale(SDL_Window *, SDL_Renderer *, float *, float *);
 
 int main(int argc, char *argv[]) {
+    net_init();
+    int result = net_request("gemini://localhost/");
+    if (result != ERR_NONE) {
+        SDL_Log("net_request() returned an error: %d", result);
+    }
+    net_free();
+    return 0;
+
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "Couldn't initialize SDL: %s",

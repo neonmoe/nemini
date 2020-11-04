@@ -19,8 +19,9 @@ for others.
 Prerequisites:
 
 - A C compiler
-- Make
 - [SDL2](https://wiki.libsdl.org/Installation#Linux.2FUnix)
+- make
+- libssl
 
 Then run:
 
@@ -67,9 +68,5 @@ instructions](https://wiki.libsdl.org/Installation#Supported_platforms).
 
 ## License
 
-TBD. Will specify some kind of an open source license once there's a
-relevant amount of code to study and redistribute.
-
-If you found your way here via an announcement post, I forgot to
-update this part and definitely meant for this to be free software
-already, oops.
+This program is distributed under the terms of the [GNU
+GPLv3](LICENSE.md) license.

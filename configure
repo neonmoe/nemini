@@ -2,9 +2,9 @@
 rm Makefile
 echo "OUTDIR=./build-linux-$(uname -m)" >> Makefile
 echo "EXE=nemini" >> Makefile
-echo "OBJS=src/main.o" >> Makefile
-echo "CFLAGS=-Os $(sdl2-config --cflags)" >> Makefile
-echo "LIBS=$(sdl2-config --libs)" >> Makefile
+echo "OBJS=src/main.o src/net.o" >> Makefile
+echo "CFLAGS=-O2 -ggdb -D_POSIX_C_SOURCE=200112L $(sdl2-config --cflags) $CFLAGS" >> Makefile
+echo "LIBS=-lcrypto -lssl $(sdl2-config --libs)" >> Makefile
 echo "OUTFLAG=-o" >> Makefile
 echo "DIRSEP=/" >> Makefile
 
