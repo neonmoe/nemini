@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
     net_init();
     int result = net_request("gemini://localhost/");
     if (result != ERR_NONE) {
-        SDL_Log("net_request() returned an error: %d", result);
+        SDL_Log("net_request() returned an error: %s", get_nemini_err_str(result));
     }
     net_free();
     return 0;

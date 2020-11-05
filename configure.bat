@@ -3,7 +3,7 @@
 if exist Makefile (del Makefile)
 echo OUTDIR=build-windows-x86>>Makefile
 echo EXE=nemini.exe>>Makefile
-echo OBJS=src\main.obj src\net.obj src\socket.obj>>Makefile
+echo OBJS=src\main.obj src\net.obj src\socket.obj src\url.obj src\error.obj>>Makefile
 echo CFLAGS=/Iinclude /TC /Wall /Os /GS /guard:cf /Za /nologo>> Makefile
 echo LIBS=/link /subsystem:windows /nologo lib\x86\SDL2main.lib lib\x86\SDL2.lib shell32.lib Ws2_32.lib>>Makefile
 echo OUTFLAG=/Fe>>Makefile

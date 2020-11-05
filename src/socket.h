@@ -3,6 +3,6 @@
 
 #include "error.h"
 
-enum nemini_error create_socket(const char *url, int *fd);
+enum nemini_error create_socket(const char *host, const char *port, int *fd);
 
 #endif
