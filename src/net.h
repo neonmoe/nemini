@@ -1,5 +1,5 @@
-#ifndef NET_H
-#define NET_H
+#ifndef NEMINI_NET_H
+#define NEMINI_NET_H
 
 #include "error.h"
 
