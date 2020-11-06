@@ -10,6 +10,7 @@ const char *get_nemini_err_str(enum nemini_error err) {
         return "url is not of the form [scheme://]<host>[:port][/resource]";
     case ERR_URL_TOO_LONG:
         return "url is too long to be a gemini url (>1024 chars)";
+    case ERR_WSA_STARTUP: return "winsock setup failed";
     case ERR_DNS_RESOLUTION: return "could not resolve host";
     case ERR_CONNECT: return "could not connect to host";
     case ERR_SSL_CTX_INIT: return "could not initialize libssl context";

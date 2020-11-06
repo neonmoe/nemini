@@ -65,6 +65,15 @@ Prerequisites:
   - Download the Visual C++ development libraries, and extract the
     `lib` and `include` directories next to this repo's `src`
     directory.
+- [LibreSSL](https://www.libressl.org/)
+  - The [OpenBSD FTP
+    server](https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/) has windows
+    builds up to version 2.5.5 as of writing this, but download
+    whichever is the newest version you can find. The windows builds
+    are named `libressl-x.x.x-windows.zip`.
+  - Extract the `x86` and `x64` folders into your `lib` folder (which
+    should be next to `src`, from the SDL2 step).
+  - The `include` folder should go next to `src`, just like SDL2.
 
 Open a Developer Command Prompt (x86) and run:
 

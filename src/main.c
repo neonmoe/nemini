@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "ctx.h"
+#include "socket.h"
 #include "net.h"
 #include "error.h"
 #include "gemini.h"
@@ -10,26 +11,43 @@ int get_refresh_rate(SDL_Window *);
 bool get_scale(SDL_Window *, SDL_Renderer *, float *, float *);
 
 int main(void) {
-    net_init();
-    struct gemini_response res = {0};
-    int result = net_request("gemini://localhost/", &res);
-    if (result != ERR_NONE) {
-        SDL_Log("net_request() returned an error: %s", get_nemini_err_str(result));
-    }
-    net_free();
-
-    SDL_Log("%d %s\n%s",
-            res.status, res.meta.mime_type, res.body);
-
-    gemini_response_free(res);
-    return 0;
-
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "Couldn't initialize SDL: %s",
                      SDL_GetError());
         return 1;
     }
+
+    int sockets_status = sockets_init();
+    if (sockets_status != ERR_NONE) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Couldn't initialize networking: %s",
+                     get_nemini_err_str(sockets_status));
+        return 1;
+    }
+
+    int net_status = net_init();
+    if (net_status != ERR_NONE) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Couldn't initialize SSL: %s",
+                     get_nemini_err_str(net_status));
+        return 1;
+    }
+
+    struct gemini_response res = {0};
+    int result = net_request("gemini://localhost/", &res);
+    if (result != ERR_NONE) {
+        SDL_Log("net_request() returned an error: %s", get_nemini_err_str(result));
+    }
+
+    SDL_Log("%d %s\n%s",
+            res.status, res.meta.mime_type, res.body);
+
+    gemini_response_free(res);
+    net_free();
+    sockets_free();
+    SDL_Quit();
+    return 0;
 
     SDL_Window *window;
     SDL_Renderer *renderer;
@@ -58,9 +76,9 @@ int main(void) {
             break;
         }
 
-        float scaleX, scaleY;
-        if (get_scale(window, renderer, &scaleX, &scaleY)) {
-            SDL_RenderSetScale(renderer, scaleX, scaleY);
+        float scale_x, scale_y;
+        if (get_scale(window, renderer, &scale_x, &scale_y)) {
+            SDL_RenderSetScale(renderer, scale_x, scale_y);
         }
 
         SDL_SetRenderDrawColor(renderer, 0x22, 0x44, 0x22, 0xFF);
@@ -89,13 +107,14 @@ int main(void) {
 
 // Returns refresh rate on success, -1 on error.
 int get_refresh_rate(SDL_Window *window) {
-    int displayIndex = SDL_GetWindowDisplayIndex(window);
-    if (displayIndex >= 0) {
+    int display_index = SDL_GetWindowDisplayIndex(window);
+    if (display_index >= 0) {
         SDL_DisplayMode mode = {0};
-        if (!SDL_GetDisplayMode(displayIndex, 0, &mode)) {
-            if (mode.refresh_rate != 0) {
-                return mode.refresh_rate;
-            }
+        if (SDL_GetDisplayMode(display_index, 0, &mode) < 0) {
+            return -1;
+        }
+        if (mode.refresh_rate != 0) {
+            return mode.refresh_rate;
         }
     }
     return -1;
@@ -103,13 +122,13 @@ int get_refresh_rate(SDL_Window *window) {
 
 // Returns true on success, scaleX and scaleY are filled.
 bool get_scale(SDL_Window *window, SDL_Renderer *renderer, float *scaleX, float *scaleY) {
-    int logicalWidth, logicalHeight;
-    SDL_GetWindowSize(window, &logicalWidth, &logicalHeight);
-    int physicalWidth, physicalHeight;
-    if (SDL_GetRendererOutputSize(renderer, &physicalWidth, &physicalHeight)) {
+    int logical_width, logical_height;
+    SDL_GetWindowSize(window, &logical_width, &logical_height);
+    int physical_width, physical_height;
+    if (SDL_GetRendererOutputSize(renderer, &physical_width, &physical_height)) {
         return false;
     }
-    *scaleX = (float) physicalWidth / (float) logicalWidth;
-    *scaleY = (float) physicalHeight / (float) logicalHeight;
+    *scaleX = (float) physical_width / (float) logical_width;
+    *scaleY = (float) physical_height / (float) logical_height;
     return true;
 }

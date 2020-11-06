@@ -19,8 +19,17 @@ int ssl_cert_verify_callback(X509_STORE_CTX *x509_store_ctx, void *arg) {
 enum nemini_error net_init(void) {
     ctx = SSL_CTX_new(TLS_method());
     if (ctx == NULL) { return ERR_SSL_CTX_INIT; }
-    if (SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION) != 1) { return ERR_SSL_TLS_MIN_FAILED; }
     SSL_CTX_set_cert_verify_callback(ctx, ssl_cert_verify_callback, NULL);
+
+#if _WIN32
+    // Apparently the newest windows build on LibreSSL's server
+    // doesn't have this function.  This makes the windows build of
+    // nemini a little insecure and not exactly Gemini spec
+    // conformant, but what can you do.
+#else
+    if (SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION) != 1) { return ERR_SSL_TLS_MIN_FAILED; }
+#endif
+
     return ERR_NONE;
 }
 
@@ -35,8 +44,8 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
     int parse_status = parse_gemini_url(url, &host, &port, &resource);
     if (parse_status != ERR_NONE) { return parse_status; }
 
-    int fd;
-    int socket_status = socket_create(host, port, &fd);
+    int socket_fd;
+    int socket_status = socket_connect(host, port, &socket_fd);
     if (socket_status != ERR_NONE) {
         err = socket_status;
         goto free_up_to_url;
@@ -46,9 +55,16 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
     if (ssl == NULL) { return ERR_UNEXPECTED; }
 
     SSL_set_connect_state(ssl);
-    if (SSL_set1_host(ssl, host) != 1||
-        SSL_set_tlsext_host_name(ssl, host) != 1 ||
-        SSL_set_fd(ssl, fd) != 1 ||
+    if (SSL_set_tlsext_host_name(ssl, host) != 1 ||
+#if _WIN32
+        // Apparently the newest windows build on LibreSSL's server
+        // doesn't have this function.  This makes the windows build of
+        // nemini a little insecure and not exactly Gemini spec
+        // conformant, but what can you do.
+#else
+        SSL_set1_host(ssl, host) != 1 ||
+#endif
+        SSL_set_fd(ssl, socket_fd) != 1 ||
         SSL_connect(ssl) != 1) {
         err = ERR_SSL_CONNECT;
         goto free_up_to_ssl;
@@ -169,6 +185,7 @@ free_up_to_bio:
 free_up_to_ssl:
     SSL_shutdown(ssl); // Result ignored on purpose
     SSL_free(ssl);
+    socket_shutdown(socket_fd);
 free_up_to_url:
     free(resource);
     free(port);
