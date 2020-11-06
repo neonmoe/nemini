@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2020 Jens Pitkanen <jens@neon.moe>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #if _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>

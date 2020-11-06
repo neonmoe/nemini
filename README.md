@@ -100,5 +100,5 @@ instructions](https://wiki.libsdl.org/Installation#Supported_platforms).
 
 ## License
 
-This program is distributed under the terms of the [GNU
-GPLv3](LICENSE.md) license.
+This program is distributed under the terms of the [GNU GPL 3.0 (or
+later)](LICENSE.md) license.

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2020 Jens Pitkanen <jens@neon.moe>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #ifndef NEMINI_GEMINI_H
 #define NEMINI_GEMINI_H
 

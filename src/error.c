@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2020 Jens Pitkanen <jens@neon.moe>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "error.h"
 
 const char *get_nemini_err_str(enum nemini_error err) {

@@ -1,5 +1,11 @@
+// SPDX-FileCopyrightText: 2020 Jens Pitkanen <jens@neon.moe>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 // The openssl code here is largely based on sircmpwn's gmni, thanks!
 // => https://git.sr.ht/~sircmpwn/gmni
+// Nothing has been copied verbatim, but my knowledge of "which ssl.h
+// functions need to be called to open a pipe to throw bytes at" was
+// gathered from reading gmni's source.
 
 #include <openssl/ssl.h>
 #include <string.h>

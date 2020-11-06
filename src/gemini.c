@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2020 Jens Pitkanen <jens@neon.moe>
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <string.h>
 #include "ctx.h"
 #include "gemini.h"
@@ -11,7 +14,7 @@ bool is_valid_gemini_header(const char *header, int header_length) {
     }
     // <STATUS><SPACE>(no meta)<CR><LF>
     int min_len = 2 + 1 + 1 + 1;
-    return header_length > min_len
+    return header_length >= min_len
         && isdigit(header[0])
         && isdigit(header[1])
         && header[2] == ' '
