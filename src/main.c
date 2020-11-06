@@ -1,19 +1,27 @@
 #include <SDL.h>
+#include <string.h>
 
 #include "ctx.h"
 #include "net.h"
 #include "error.h"
+#include "gemini.h"
 
 int get_refresh_rate(SDL_Window *);
 bool get_scale(SDL_Window *, SDL_Renderer *, float *, float *);
 
-int main(int argc, char *argv[]) {
+int main(void) {
     net_init();
-    int result = net_request("gemini://localhost/");
+    struct gemini_response res = {0};
+    int result = net_request("gemini://localhost/", &res);
     if (result != ERR_NONE) {
         SDL_Log("net_request() returned an error: %s", get_nemini_err_str(result));
     }
     net_free();
+
+    SDL_Log("%d %s\n%s",
+            res.status, res.meta.mime_type, res.body);
+
+    gemini_response_free(res);
     return 0;
 
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
