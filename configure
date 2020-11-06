@@ -1,6 +1,7 @@
 #!/bin/sh
 # TODO: Add flag parsing and take into account --bindir, --libdir, --prefix and --debug
 
+# -D_POSIX_C_SOURCE=200112L is required by getaddrinfo() and the gang.
 CFLAGS="-D_POSIX_C_SOURCE=200112L $(pkg-config --cflags sdl2 libssl libcrypto) $CFLAGS"
 if [ "$1" = "--debug" ]; then
     CFLAGS="-Og -ggdb -Wall -Wextra -Wpedantic $CFLAGS"
@@ -12,6 +13,7 @@ rm Makefile
 echo "OUTDIR=./build-linux-$(uname -m)" >> Makefile
 echo "EXE=nemini" >> Makefile
 echo "OBJS=src/main.o src/net.o src/socket.o src/url.o src/error.o src/gemini.o" >> Makefile
+# See CFLAGS definition above
 echo "CFLAGS=$CFLAGS" >> Makefile
 echo "LIBS=$(pkg-config --libs sdl2 libssl libcrypto)" >> Makefile
 echo "OUTFLAG=-o" >> Makefile

@@ -14,16 +14,24 @@ All the build files are hand-written and very short, please
 familiarize yourself with them if you intend to package this software
 for others.
 
-### Linux
+### Linux, probably other POSIXy systems
 
 Prerequisites:
 
+- A POSIX.1-2001 compliant system.
+  - I think. getaddrinfo() is needed, is what I mean here.
+  - I imagine this also implies that you have libc, but in case it
+    doesn't, string.h is also used in the program, so get yourself a
+    libc.
 - A C compiler
-- [SDL2](https://wiki.libsdl.org/Installation#Linux.2FUnix)
 - make
-- pkg-config
-- libssl
-- libcrypto
+- [SDL2](https://wiki.libsdl.org/Installation#Linux.2FUnix)
+- pkg-config ([pkgconf](http://pkgconf.org/),
+  [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/))
+- libssl ([LibreSSL](https://www.libressl.org/),
+  [OpenSSL](https://www.openssl.org/))
+- libcrypto ([LibreSSL](https://www.libressl.org/),
+  [OpenSSL](https://www.openssl.org/))
 
 Then run:
 
@@ -34,12 +42,25 @@ make
 
 The executable will be built into the `build-linux-<arch>` directory.
 
+#### Example package configurations
+
+Feel free to send patches containing setups for your favorite distro,
+so others can benefit from your working setup.
+
+- Arch Linux:
+  - `core/gcc` (build dependency)
+  - `core/make` (build dependency)
+  - `extra/sdl2`
+  - `core/openssl`
+  - `core/glibc`
+
 ### Windows
 
 Prerequisites:
 
 - [MSVC](https://visualstudio.microsoft.com/)
-  - Specifically, you need nmake.exe, cl.exe, and link.exe.
+  - Specifically, you need nmake.exe, cl.exe, and link.exe. Install
+    Visual Studio and those should be included.
 - [SDL2](https://libsdl.org/download-2.0.php)
   - Download the Visual C++ development libraries, and extract the
     `lib` and `include` directories next to this repo's `src`
