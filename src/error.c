@@ -22,6 +22,7 @@ const char *get_nemini_err_str(enum nemini_error err) {
         return "cert verification failed: cannot trust server";
     case ERR_PUT_REQUEST: return "io error sending request";
     case ERR_GET_HEADER: return "io error receiving response header";
+    case ERR_MALFORMED_HEADER: return "expected gemini header, got something else";
     case ERR_GET_BODY: return "io error receiving response body";
     default: return "unknown error";
     }

@@ -29,13 +29,18 @@ void net_free(void) {
 }
 
 enum nemini_error net_request(const char *url, struct gemini_response *result) {
+    enum nemini_error err = ERR_NONE;
+
     char *host, *port, *resource;
     int parse_status = parse_gemini_url(url, &host, &port, &resource);
     if (parse_status != ERR_NONE) { return parse_status; }
 
     int fd;
-    int socket_status = create_socket(host, port, &fd);
-    if (socket_status != ERR_NONE) { return socket_status; }
+    int socket_status = socket_create(host, port, &fd);
+    if (socket_status != ERR_NONE) {
+        err = socket_status;
+        goto free_up_to_url;
+    }
 
     SSL *ssl = SSL_new(ctx);
     if (ssl == NULL) { return ERR_UNEXPECTED; }
@@ -45,30 +50,20 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
         SSL_set_tlsext_host_name(ssl, host) != 1 ||
         SSL_set_fd(ssl, fd) != 1 ||
         SSL_connect(ssl) != 1) {
-
-        SSL_free(ssl);
-        free(resource);
-        free(port);
-        free(host);
-        return ERR_SSL_CONNECT;
+        err = ERR_SSL_CONNECT;
+        goto free_up_to_ssl;
     }
 
     X509 *cert = SSL_get_peer_certificate(ssl);
     if (cert == NULL) {
-        SSL_free(ssl);
-        free(resource);
-        free(port);
-        free(host);
-        return ERR_SSL_CERT_MISSING;
+        err = ERR_SSL_CERT_MISSING;
+        goto free_up_to_ssl;
     }
 
     long verification = SSL_get_verify_result(ssl);
     if (verification != X509_V_OK) {
-        SSL_free(ssl);
-        free(resource);
-        free(port);
-        free(host);
-        return ERR_SSL_CERT_VERIFY;
+        err = ERR_SSL_CERT_VERIFY;
+        goto free_up_to_ssl;
     }
 
     BIO *bio_ssl = BIO_new(BIO_f_ssl());
@@ -85,54 +80,35 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
     memcpy(request, url, url_length);
     memcpy(request + url_length, "\r\n\0", 3);
     if (BIO_puts(bio_ssl, request) == -1) {
-        BIO_free(bio_buffered);
-        BIO_free(bio_ssl);
-        SSL_free(ssl);
-        free(resource);
-        free(port);
-        free(host);
-        return ERR_PUT_REQUEST;
+        err = ERR_PUT_REQUEST;
+        goto free_up_to_bio;
     }
 
     // Length: <STATUS><SPACE><META><CR><LF><NUL>
     char gemini_header[2 + 1 + 1024 + 1 + 1 + 1] = {0};
     int header_bytes = BIO_gets(bio_buffered, gemini_header, sizeof(gemini_header));
     if (header_bytes == -1) {
-        BIO_free(bio_buffered);
-        BIO_free(bio_ssl);
-        SSL_free(ssl);
-        free(resource);
-        free(port);
-        free(host);
-        return ERR_GET_HEADER;
+        err = ERR_GET_HEADER;
+        goto free_up_to_bio;
     }
 
     struct gemini_response res = {0};
     res.status = (gemini_header[0] - '0') * 10 + (gemini_header[1] - '0');
     if (!is_valid_gemini_header(gemini_header, header_bytes)) {
-        BIO_free(bio_buffered);
-        BIO_free(bio_ssl);
-        SSL_free(ssl);
-        free(resource);
-        free(port);
-        free(host);
-        return ERR_OUT_OF_MEMORY;
+        err = ERR_MALFORMED_HEADER;
+        goto free_up_to_bio;
     }
     int meta_length = header_bytes - 2 - 1 - 2;
     char *meta = malloc(meta_length + 1);
     if (meta == NULL) {
-        BIO_free(bio_buffered);
-        BIO_free(bio_ssl);
-        SSL_free(ssl);
-        free(resource);
-        free(port);
-        free(host);
-        return ERR_OUT_OF_MEMORY;
+        err = ERR_OUT_OF_MEMORY;
+        goto free_up_to_bio;
     }
     memcpy(meta, gemini_header + 3, meta_length);
     meta[meta_length] = '\0';
     res.meta.meta = meta;
 
+    // Only input (2X) responses have a body.
     if (gemini_header[0] == '2') {
         void *body = NULL;
         int body_length = 0;
@@ -145,20 +121,17 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
                 } else {
                     body_length *= 2;
                 }
+
                 void *prev_body = body;
                 body = realloc(body, body_length);
                 if (body == NULL) {
                     free(prev_body);
                     free(meta);
-                    BIO_free(bio_buffered);
-                    BIO_free(bio_ssl);
-                    SSL_free(ssl);
-                    free(resource);
-                    free(port);
-                    free(host);
-                    return ERR_OUT_OF_MEMORY;
+                    err = ERR_OUT_OF_MEMORY;
+                    goto free_up_to_bio;
                 }
             }
+
             void *cursor = (void *)(&((char *)body)[written_length]);
             bytes_read = BIO_read(bio_buffered, cursor,
                                   body_length - written_length);
@@ -166,6 +139,7 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
                 written_length += bytes_read;
             }
         } while (bytes_read > 0);
+
         if (bytes_read == 0) {
             if (written_length >= body_length || written_length < 0) {
                 // Before reading, the memory is reallocated if the
@@ -178,13 +152,8 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
         } else {
             free(body);
             free(meta);
-            BIO_free(bio_buffered);
-            BIO_free(bio_ssl);
-            SSL_free(ssl);
-            free(resource);
-            free(port);
-            free(host);
-            return ERR_GET_BODY;
+            err = ERR_GET_BODY;
+            goto free_up_to_bio;
         }
     } else {
         res.body = NULL;
@@ -192,14 +161,18 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
 
     // res.body and res.meta.meta are allocated in this function, but outlive it.
     // They are free with gemini_response_free();
+    *result = res;
 
+free_up_to_bio:
     BIO_free(bio_buffered);
     BIO_free(bio_ssl);
+free_up_to_ssl:
+    SSL_shutdown(ssl); // Result ignored on purpose
     SSL_free(ssl);
+free_up_to_url:
     free(resource);
     free(port);
     free(host);
 
-    *result = res;
-    return ERR_NONE;
+    return err;
 }

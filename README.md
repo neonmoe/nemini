@@ -21,7 +21,9 @@ Prerequisites:
 - A C compiler
 - [SDL2](https://wiki.libsdl.org/Installation#Linux.2FUnix)
 - make
+- pkg-config
 - libssl
+- libcrypto
 
 Then run:
 

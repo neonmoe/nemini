@@ -6,7 +6,7 @@
 
 #include "error.h"
 
-enum nemini_error create_socket(const char *host, const char *port, int *fd) {
+enum nemini_error socket_create(const char *host, const char *port, int *fd) {
     struct addrinfo hints;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;

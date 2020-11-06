@@ -20,8 +20,8 @@ bool is_valid_gemini_header(const char *header, int header_length) {
 }
 
 void gemini_response_free(struct gemini_response res) {
-    if (res.meta != NULL) {
-        free(res.meta);
+    if (res.meta.meta != NULL) {
+        free(res.meta.meta);
     }
     if (res.body != NULL) {
         free(res.body);

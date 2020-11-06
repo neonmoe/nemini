@@ -29,6 +29,7 @@ enum nemini_error {
     ERR_SSL_CERT_VERIFY,
     ERR_PUT_REQUEST,
     ERR_GET_HEADER,
+    ERR_MALFORMED_HEADER,
     ERR_GET_BODY,
 };
 

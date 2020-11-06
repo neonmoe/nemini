@@ -10,7 +10,6 @@ echo OUTFLAG=/Fe>>Makefile
 echo DIRSEP=\\>>Makefile
 
 echo RMFILE=del /Q>>Makefile
-echo RMDIR=rmdir /Q>>Makefile
 echo MKDIR=mkdir>>Makefile
 echo WINDOWS_DLL_COPYING_STEP=copy lib\x86\SDL2.dll build-windows-x86>>Makefile
 echo WINDOWS_DLL_DELETION_STEP=del build-windows-x86\SDL2.dll>>Makefile
