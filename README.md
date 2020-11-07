@@ -64,21 +64,40 @@ so others can benefit from your working setup.
 Prerequisites:
 
 - [MSVC](https://visualstudio.microsoft.com/)
-  - Specifically, you need nmake.exe, cl.exe, and link.exe. Install
-    Visual Studio and those should be included.
+  - Specifically, you need nmake.exe, cl.exe, and CMake. Install
+    the following from Visual Studio Installer:
+  - The newest package named: `MSVC ... build tools ...`
+  - `C++ CMake Tools for Windows` (Needed to build LibreSSL below)
 - [SDL2](https://libsdl.org/download-2.0.php)
   - Download the Visual C++ development libraries, and extract the
     `lib` and `include` directories next to this repo's `src`
     directory.
 - [LibreSSL](https://www.libressl.org/)
-  - The [OpenBSD FTP
-    server](https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/) has windows
-    builds up to version 2.5.5 as of writing this, but download
-    whichever is the newest version you can find. The windows builds
-    are named `libressl-x.x.x-windows.zip`.
-  - Extract the `x86` and `x64` folders into your `lib` folder (which
-    should be next to `src`, from the SDL2 step).
-  - The `include` folder should go next to `src`, just like SDL2.
+  - The newest windows binaries released for LibreSSL (2.2.5, as I'm
+    writing this) are too old to support the TOFU verification this
+    program has, so you'll need to build LibreSSL
+    yourself. Thankfully, it's pretty easy.
+  - Download the newest tarball (`libressl-x.x.x.tar.gz`) from
+    e.g. [OpenBSD's ftp
+    server](https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/), extract it
+    somewhere, then build it in the Developer Command Prompt:
+
+    ```
+    mkdir build-nmake
+    cd build-nmake
+    cmake -G "NMake Makefiles" -DBUILD_SHARED_LIBS=ON ..
+    nmake
+    ```
+
+  - Copy `crypto-<number>.dll` and `crypto-<number>.lib` from the
+    `build-nmake\crypto\` directory into the `lib\x86\` directory
+    where the SDL files are.
+  - Copy `ssl-<number>.dll` and `ssl-<number>.lib` from the
+    `build-nmake\ssl\` directory into the `lib\x86\` directory
+    where the SDL files are.
+  - Finally, copy the `include` directory from the libressl root
+    directory (same dir as `build-nmake`) to this directory, similar
+    to the SDL `include` directory.
 
 Open a Developer Command Prompt (x86) and run:
 
