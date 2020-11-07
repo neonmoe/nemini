@@ -66,12 +66,19 @@ int main(void) {
     SDL_SetWindowTitle(window, "Nemini");
 
     struct gemini_response res = {0};
-    int result = net_request("gemini://localhost/", &res);
+    int result = net_request("gemini://192.168.1.106/", &res);
     if (result != ERR_NONE) {
-        SDL_Log("net_request() returned an error: %s", get_nemini_err_str(result));
+        char buffer[1024];
+        SDL_snprintf(buffer, 1024, "net_request() returned an error: %s", get_nemini_err_str(result));
+        SDL_Log("%s", buffer);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "error", buffer, window);
         return 1;
     } else {
-        SDL_Log("%d %s\n%s", res.status, res.meta.mime_type, res.body);
+        char buffer[64 * 1024];
+        SDL_snprintf(buffer, sizeof(buffer), "Body read.\nStatus: %d\nMeta: \"%s\"\nBody: %s",
+                     res.status, res.meta.meta, res.body);
+        SDL_Log("%s", buffer);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "net_request()", buffer, NULL);
     }
 
     bool running = true;

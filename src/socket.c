@@ -10,6 +10,8 @@
 #include <sys/types.h>
 #include <netdb.h>
 #include <unistd.h>
+#define INVALID_SOCKET -1
+#define SOCKET_ERROR -1
 #endif
 
 #include <SDL.h>
@@ -38,6 +40,7 @@ void socket_shutdown(int fd) {
     closesocket(fd);
 #else
     shutdown(fd, SHUT_RDWR);
+    close(fd);
 #endif
 }
 
@@ -58,26 +61,30 @@ enum nemini_error socket_connect(const char *host, const char *port, int *fd) {
         return ERR_DNS_RESOLUTION;
     }
 
-    int socket_fd = -1;
+    int socket_fd = INVALID_SOCKET;
     struct addrinfo *rp;
     for (rp = info; rp != NULL; rp = rp->ai_next) {
         socket_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-        if (socket_fd == -1) {
+        if (socket_fd == INVALID_SOCKET) {
             continue;
         }
 
-        if (connect(socket_fd, rp->ai_addr, rp->ai_addrlen) != -1) {
+        if (connect(socket_fd, rp->ai_addr, rp->ai_addrlen) != SOCKET_ERROR) {
             // Ok!
             break;
         }
 
+#if _WIN32
+        closesocket(socket_fd);
+#else
         close(socket_fd);
+#endif
         socket_fd = -1;
     }
 
     freeaddrinfo(info);
 
-    if (socket_fd != -1) {
+    if (socket_fd != INVALID_SOCKET) {
         *fd = socket_fd;
         return ERR_NONE;
     } else {
