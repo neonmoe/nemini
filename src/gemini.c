@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2020 Jens Pitkanen <jens@neon.moe>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <string.h>
 #include "ctx.h"
 #include "gemini.h"
 
@@ -24,9 +23,9 @@ bool is_valid_gemini_header(const char *header, int header_length) {
 
 void gemini_response_free(struct gemini_response res) {
     if (res.meta.meta != NULL) {
-        free(res.meta.meta);
+        SDL_free(res.meta.meta);
     }
     if (res.body != NULL) {
-        free(res.body);
+        SDL_free(res.body);
     }
 }

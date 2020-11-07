@@ -8,7 +8,6 @@
 // gathered from reading gmni's source.
 
 #include <openssl/ssl.h>
-#include <string.h>
 #include <SDL.h>
 #include "error.h"
 #include "socket.h"
@@ -97,10 +96,10 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
     BIO_set_ssl(bio_ssl, ssl, 0);
     BIO_push(bio_buffered, bio_ssl);
 
-    int url_length = strlen(url);
-    char *request = malloc(url_length + 3);
-    memcpy(request, url, url_length);
-    memcpy(request + url_length, "\r\n\0", 3);
+    int url_length = SDL_strlen(url);
+    char *request = SDL_malloc(url_length + 3);
+    SDL_memcpy(request, url, url_length);
+    SDL_memcpy(request + url_length, "\r\n\0", 3);
     if (BIO_puts(bio_ssl, request) == -1) {
         err = ERR_PUT_REQUEST;
         goto free_up_to_bio;
@@ -121,12 +120,12 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
         goto free_up_to_bio;
     }
     int meta_length = header_bytes - 2 - 1 - 2;
-    char *meta = malloc(meta_length + 1);
+    char *meta = SDL_malloc(meta_length + 1);
     if (meta == NULL) {
         err = ERR_OUT_OF_MEMORY;
         goto free_up_to_bio;
     }
-    memcpy(meta, gemini_header + 3, meta_length);
+    SDL_memcpy(meta, gemini_header + 3, meta_length);
     meta[meta_length] = '\0';
     res.meta.meta = meta;
 
@@ -147,8 +146,8 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
                 void *prev_body = body;
                 body = realloc(body, body_length);
                 if (body == NULL) {
-                    free(prev_body);
-                    free(meta);
+                    SDL_free(prev_body);
+                    SDL_free(meta);
                     err = ERR_OUT_OF_MEMORY;
                     goto free_up_to_bio;
                 }
@@ -172,8 +171,8 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
             res.body = (char *) body;
             res.body[written_length] = '\0';
         } else {
-            free(body);
-            free(meta);
+            SDL_free(body);
+            SDL_free(meta);
             err = ERR_GET_BODY;
             goto free_up_to_bio;
         }
@@ -193,9 +192,9 @@ free_up_to_ssl:
     SSL_free(ssl);
     socket_shutdown(socket_fd);
 free_up_to_url:
-    free(resource);
-    free(port);
-    free(host);
+    SDL_free(resource);
+    SDL_free(port);
+    SDL_free(host);
 
     return err;
 }

@@ -12,6 +12,7 @@
 #include <unistd.h>
 #endif
 
+#include <SDL.h>
 #include "error.h"
 
 enum nemini_error sockets_init(void) {
@@ -42,7 +43,7 @@ void socket_shutdown(int fd) {
 
 enum nemini_error socket_connect(const char *host, const char *port, int *fd) {
     struct addrinfo hints;
-    memset(&hints, 0, sizeof(hints));
+    SDL_memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = 0;

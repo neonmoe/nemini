@@ -143,45 +143,45 @@ enum nemini_error parse_gemini_url(char *input_url, char **host, char **port,
     if (host_inline == NULL) {
         return ERR_UNEXPECTED;
     } else {
-        *host = malloc(host_len + 1);
+        *host = SDL_malloc(host_len + 1);
         if (*host == NULL) { return ERR_OUT_OF_MEMORY; }
-        memcpy(*host, host_inline, host_len);
+        SDL_memcpy(*host, host_inline, host_len);
         (*host)[host_len] = '\0';
     }
 
     if (port_inline == NULL) {
-        *port = malloc(5);
+        *port = SDL_malloc(5);
         if (*port == NULL) {
-            free(*host);
+            SDL_free(*host);
             return ERR_OUT_OF_MEMORY;
         }
-        memcpy(*port, "1965\0", 5);
+        SDL_memcpy(*port, "1965\0", 5);
     } else {
-        *port = malloc(port_len + 1);
+        *port = SDL_malloc(port_len + 1);
         if (*port == NULL) {
-            free(*host);
+            SDL_free(*host);
             return ERR_OUT_OF_MEMORY;
         }
-        memcpy(*port, port_inline, port_len);
+        SDL_memcpy(*port, port_inline, port_len);
         (*port)[port_len] = '\0';
     }
 
     if (resource_inline == NULL) {
-        *resource = malloc(1);
+        *resource = SDL_malloc(1);
         if (*resource == NULL) {
-            free(*host);
-            free(*port);
+            SDL_free(*host);
+            SDL_free(*port);
             return ERR_OUT_OF_MEMORY;
         }
-        memcpy(*resource, "\0", 1);
+        SDL_memcpy(*resource, "\0", 1);
     } else {
-        *resource = malloc(resource_len + 1);
+        *resource = SDL_malloc(resource_len + 1);
         if (*resource == NULL) {
-            free(*host);
-            free(*port);
+            SDL_free(*host);
+            SDL_free(*port);
             return ERR_OUT_OF_MEMORY;
         }
-        memcpy(*resource, resource_inline, resource_len);
+        SDL_memcpy(*resource, resource_inline, resource_len);
         (*resource)[resource_len] = '\0';
     }
 

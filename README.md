@@ -8,26 +8,31 @@ as well as presumably everything else¹.
 ¹ Namely, operating systems with an SDL 2.0 port. Check out the list
 [here](https://wiki.libsdl.org/Installation#Supported_platforms).
 
+## Security considerations
+
+[stb_truetype.h](src/stb_truetype.h) is used for text rendering. As it
+mentions in a comment at the start, it doesn't check offsets found in
+the font files it reads, which could lead to this program reading
+arbitrary memory.
+
+TODO: Provide a way to set the default font.
+
 ## Building
 
 All the build files are hand-written and very short, please
 familiarize yourself with them if you intend to package this software
 for others.
 
-### Linux, probably other POSIXy systems
+### Linux, probably other POSIX systems
 
 Prerequisites:
 
-- A POSIX.1-2001 compliant system.
-  - I think. getaddrinfo() is needed, is what I mean here.
-  - I imagine this also implies that you have libc, but in case it
-    doesn't, string.h is also used in the program, so get yourself a
-    libc.
 - A C compiler
 - make
-- [SDL2](https://wiki.libsdl.org/Installation#Linux.2FUnix)
 - pkg-config ([pkgconf](http://pkgconf.org/),
   [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/))
+- A POSIX.1-2001 compliant system for getaddrinfo().
+- [SDL2](https://wiki.libsdl.org/Installation#Linux.2FUnix)
 - libssl ([LibreSSL](https://www.libressl.org/),
   [OpenSSL](https://www.openssl.org/))
 - libcrypto ([LibreSSL](https://www.libressl.org/),

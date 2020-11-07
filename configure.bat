@@ -20,18 +20,18 @@ echo OUTDIR=build-windows-x86>>Makefile
 echo EXE=nemini.exe>>Makefile
 echo OBJS=src\main.obj src\net.obj src\socket.obj src\url.obj src\error.obj src\gemini.obj>>Makefile
 echo CFLAGS=/Iinclude /TC /O2 /GS /guard:cf /nologo>> Makefile
-echo LIBS=/link /subsystem:windows /nologo lib\x86\SDL2main.lib lib\x86\SDL2.lib lib\x86\libcrypto*.lib lib\x86\libssl*.lib shell32.lib Ws2_32.lib>>Makefile
+echo LIBS=/link /subsystem:windows /nologo lib\x86\SDL2main.lib lib\x86\SDL2.lib lib\x86\*crypto*.lib lib\x86\*ssl*.lib shell32.lib Ws2_32.lib>>Makefile
 echo OUTFLAG=/Fe>>Makefile
 echo DIRSEP=\\>>Makefile
 
 echo RMFILE=del /Q>>Makefile
 echo MKDIR=mkdir>>Makefile
 echo WINDOWS_COPY_SDL_DLL=copy lib\x86\SDL2.dll build-windows-x86>>Makefile
-echo WINDOWS_COPY_LIBSSL_DLL=copy lib\x86\libssl*.dll build-windows-x86>>Makefile
-echo WINDOWS_COPY_LIBCRYPTO_DLL=copy lib\x86\libcrypto*.dll build-windows-x86>>Makefile
+echo WINDOWS_COPY_LIBSSL_DLL=copy lib\x86\*ssl*.dll build-windows-x86>>Makefile
+echo WINDOWS_COPY_LIBCRYPTO_DLL=copy lib\x86\*crypto*.dll build-windows-x86>>Makefile
 echo WINDOWS_DELETE_SDL_DLL=$(RMFILE) build-windows-x86\SDL2.dll>>Makefile
-echo WINDOWS_DELETE_LIBSSL_DLL=$(RMFILE) build-windows-x86\libssl*.dll>>Makefile
-echo WINDOWS_DELETE_LIBCRYPTO_DLL=$(RMFILE) build-windows-x86\libcrypto*.dll>>Makefile
+echo WINDOWS_DELETE_LIBSSL_DLL=$(RMFILE) build-windows-x86\*ssl*.dll>>Makefile
+echo WINDOWS_DELETE_LIBCRYPTO_DLL=$(RMFILE) build-windows-x86\*crypto*.dll>>Makefile
 
 type Makefile.in>>Makefile
 

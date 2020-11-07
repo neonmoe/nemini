@@ -2,7 +2,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <SDL.h>
-#include <string.h>
+
+#define STBTT_ifloor(x) ((int) SDL_floor(x))
+#define STBTT_iceil(x) ((int) SDL_ceil(x))
+#define STBTT_sqrt(x) SDL_sqrt(x)
+#define STBTT_pow(x, y) SDL_pow(x, y)
+#define STBTT_fmod(x, y) SDL_fmod(x, y)
+#define STBTT_cos(x) SDL_cos(x)
+#define STBTT_acos(x) SDL_acos(x)
+#define STBTT_fabs(x) SDL_fabs(x)
+#define STBTT_malloc(x,u) ((void)(u),SDL_malloc(x))
+#define STBTT_free(x,u) ((void)(u),SDL_free(x))
+#define STBTT_assert(x) SDL_assert(x)
+#define STBTT_strlen(x) SDL_strlen(x)
+#define STBTT_memcpy SDL_memcpy
+#define STBTT_memset SDL_memset
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
 
 #include "ctx.h"
 #include "socket.h"
@@ -78,7 +94,7 @@ int main(void) {
             SDL_RenderSetScale(renderer, scale_x, scale_y);
         }
 
-        SDL_SetRenderDrawColor(renderer, 0x22, 0x44, 0x22, 0xFF);
+        SDL_SetRenderDrawColor(renderer, 0xDD, 0xDD, 0xDD, 0xDD);
         SDL_RenderClear(renderer);
         SDL_RenderPresent(renderer);
 
