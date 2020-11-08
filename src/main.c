@@ -65,12 +65,24 @@ int main(void) {
         SDL_Log("%s", buffer);
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "error", buffer, window);
         return 1;
+    }
+
+    if (res.status / 10 != 2) {
+        SDL_Log("Response status is not 2X, not rendering into text.");
+    } else if (SDL_strcmp(res.meta.mime_type, "text/gemini") != 0) {
+        SDL_Log("Response status is not 2X, not rendering into text.");
     } else {
-        char buffer[64 * 1024];
-        SDL_snprintf(buffer, sizeof(buffer), "Body read.\nStatus: %d\nMeta: \"%s\"\nBody: %s",
-                     res.status, res.meta.meta, res.body);
-        SDL_Log("%s", buffer);
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "net_request()", buffer, NULL);
+        SDL_Texture *texture = NULL;
+        enum nemini_error text_status = text_render(res.body, &texture);
+        if (text_status != ERR_NONE) {
+            char buffer[1024];
+            SDL_snprintf(buffer, 1024, "text_render() returned an error: %s",
+                         get_nemini_err_str(result));
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", buffer);
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "error", buffer, window);
+        } else {
+            SDL_Log("Text rendered successfully.");
+        }
     }
 
     bool running = true;

@@ -7,6 +7,11 @@ const char *get_nemini_err_str(enum nemini_error err) {
     switch (err) {
     case ERR_NONE: return "no error";
     case ERR_UNEXPECTED: return "unexpected error, this is a bug";
+    case ERR_SRC_STR_NULL: return "input string is null";
+    case ERR_SUBSTR_OFFSET_OUT_OF_BOUNDS:
+        return "substring start is out of bounds";
+    case ERR_SUBSTR_LENGTH_OUT_OF_BOUNDS:
+        return "substring end is out of bounds";
     case ERR_OUT_OF_MEMORY: return "out of memory";
     case ERR_UNSUPPORTED_PROTOCOL: return "unsupported protocol in url";
     case ERR_MALFORMED_URL:
@@ -26,7 +31,8 @@ const char *get_nemini_err_str(enum nemini_error err) {
         return "cert verification failed: cannot trust server";
     case ERR_PUT_REQUEST: return "io error sending request";
     case ERR_GET_HEADER: return "io error receiving response header";
-    case ERR_MALFORMED_HEADER: return "expected gemini header, got something else";
+    case ERR_MALFORMED_HEADER:
+        return "expected gemini header, got something else";
     case ERR_GET_BODY: return "io error receiving response body";
     default: return "unknown error";
     }

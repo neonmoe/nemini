@@ -77,7 +77,7 @@ enum nemini_error parse_gemini_url(char *input_url, char **host, char **port,
     host_inline = input_url;
 
     enum url_reading_stage stage = HOST_OR_SCHEME;
-    for (char *cursor = input_url; *cursor != 0; cursor++) {
+    for (char *cursor = input_url; *cursor != '\0'; cursor++) {
         if (cursor - input_url > 1024) {
             return ERR_URL_TOO_LONG;
         }
