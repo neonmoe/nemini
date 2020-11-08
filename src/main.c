@@ -3,28 +3,12 @@
 
 #include <SDL.h>
 
-#define STBTT_ifloor(x) ((int) SDL_floor(x))
-#define STBTT_iceil(x) ((int) SDL_ceil(x))
-#define STBTT_sqrt(x) SDL_sqrt(x)
-#define STBTT_pow(x, y) SDL_pow(x, y)
-#define STBTT_fmod(x, y) SDL_fmod(x, y)
-#define STBTT_cos(x) SDL_cos(x)
-#define STBTT_acos(x) SDL_acos(x)
-#define STBTT_fabs(x) SDL_fabs(x)
-#define STBTT_malloc(x,u) ((void)(u),SDL_malloc(x))
-#define STBTT_free(x,u) ((void)(u),SDL_free(x))
-#define STBTT_assert(x) SDL_assert(x)
-#define STBTT_strlen(x) SDL_strlen(x)
-#define STBTT_memcpy SDL_memcpy
-#define STBTT_memset SDL_memset
-#define STB_TRUETYPE_IMPLEMENTATION
-#include "stb_truetype.h"
-
 #include "ctx.h"
 #include "socket.h"
 #include "net.h"
 #include "error.h"
 #include "gemini.h"
+#include "text.h"
 
 int get_refresh_rate(SDL_Window *);
 bool get_scale(SDL_Window *, SDL_Renderer *, float *, float *);
@@ -60,6 +44,14 @@ int main(void) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "Couldn't create window and renderer: %s",
                      SDL_GetError());
+        return 1;
+    }
+
+    int text_renderer_status = text_renderer_init();
+    if (text_renderer_status != ERR_NONE) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Couldn't init the text rendering system: %s",
+                     get_nemini_err_str(text_renderer_status));
         return 1;
     }
 
@@ -131,14 +123,12 @@ int main(void) {
 
     gemini_response_free(res);
 
+    text_renderer_free();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
-
-    SDL_Quit();
-
     net_free();
     sockets_free();
-
+    SDL_Quit();
     return 0;
 }
 
