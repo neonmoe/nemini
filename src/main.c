@@ -40,7 +40,7 @@ int main(void) {
     SDL_Window *window;
     SDL_Renderer *renderer;
     Uint32 flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
-    if (SDL_CreateWindowAndRenderer(320, 240, flags, &window, &renderer)) {
+    if (SDL_CreateWindowAndRenderer(640, 480, flags, &window, &renderer)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                      "Couldn't create window and renderer: %s",
                      SDL_GetError());
@@ -57,33 +57,56 @@ int main(void) {
 
     SDL_SetWindowTitle(window, "Nemini");
 
+
+    // TODO: Move this entire section to a "load page" module (remember frees too)
+    // TODO: Actually parse the mime type
+    Uint32 response_start = SDL_GetTicks();
     struct gemini_response res = {0};
+    SDL_Texture *gemtext_texture = NULL;
     int result = net_request("gemini://192.168.1.106/", &res);
     if (result != ERR_NONE) {
         char buffer[1024];
-        SDL_snprintf(buffer, 1024, "net_request() returned an error: %s", get_nemini_err_str(result));
+        SDL_snprintf(buffer, 1024, "net_request() returned an error: %s",
+                     get_nemini_err_str(result));
         SDL_Log("%s", buffer);
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "error", buffer, window);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
+                                 "error", buffer, window);
         return 1;
     }
-
+    SDL_Log("Got response in %.3f seconds", (SDL_GetTicks() - response_start) / 1000.0);
     if (res.status / 10 != 2) {
         SDL_Log("Response status is not 2X, not rendering into text.");
     } else if (SDL_strcmp(res.meta.mime_type, "text/gemini") != 0) {
         SDL_Log("Response status is not 2X, not rendering into text.");
     } else {
-        SDL_Texture *texture = NULL;
-        enum nemini_error text_status = text_render(res.body, &texture);
-        if (text_status != ERR_NONE) {
+        Uint32 render_start = SDL_GetTicks();
+        float scale_x, scale_y;
+        get_scale(window, renderer, &scale_x, &scale_y);
+        SDL_Surface *surface = NULL;
+        result = text_render(&surface, res.body,
+                             (int)(600 * scale_x), scale_x);
+        if (result != ERR_NONE) {
             char buffer[1024];
-            SDL_snprintf(buffer, 1024, "text_render() returned an error: %s",
-                         get_nemini_err_str(result));
+            SDL_snprintf(buffer, 1024, "text_render() returned an error: %s (%d)",
+                         get_nemini_err_str(result), result);
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", buffer);
-            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "error", buffer, window);
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
+                                     "error", buffer, window);
+            return 1;
+        } else if (surface == NULL) {
+            SDL_Log("Texture rendering still failed!");
+            return 1;
         } else {
-            SDL_Log("Text rendered successfully.");
+            gemtext_texture = SDL_CreateTextureFromSurface(renderer, surface);
+            if (gemtext_texture == NULL) {
+                SDL_Log("Could not create texture from surface: %s", SDL_GetError());
+                return 1;
+            }
+            SDL_FreeSurface(surface);
+            SDL_Log("Text rendered successfully in %.3f seconds", (SDL_GetTicks() - render_start) / 1000.0);
         }
     }
+
 
     bool running = true;
     int refresh_rate = 60;
@@ -104,9 +127,26 @@ int main(void) {
         if (get_scale(window, renderer, &scale_x, &scale_y)) {
             SDL_RenderSetScale(renderer, scale_x, scale_y);
         }
-
+        int width, height;
+        SDL_GetRendererOutputSize(renderer, &width, &height);
+        width /= scale_x;
+        height /= scale_y;
         SDL_SetRenderDrawColor(renderer, 0xDD, 0xDD, 0xDD, 0xDD);
         SDL_RenderClear(renderer);
+
+        Uint32 t_format;
+        int t_access, t_width, t_height;
+        SDL_QueryTexture(gemtext_texture, &t_format, &t_access,
+                         &t_width, &t_height);
+        t_width /= scale_x;
+        t_height /= scale_y;
+        SDL_Rect dst_rect = {0};
+        dst_rect.x = (width - t_width) / 2;
+        dst_rect.y = 8;
+        dst_rect.w = t_width;
+        dst_rect.h = t_height;
+        SDL_RenderCopy(renderer, gemtext_texture, NULL, &dst_rect);
+
         SDL_RenderPresent(renderer);
 
         // Temporary fps displayer until the text rendering system is
@@ -117,7 +157,10 @@ int main(void) {
         long now = SDL_GetTicks();
         if (now - last_time >= 1000) {
             last_time = now;
-            SDL_Log("FPS: %d (avg. frame duration: %.2f ms)", frame_counter, 1000.0 / frame_counter);
+            char buf[1024];
+            SDL_snprintf(buf, 1024, "FPS: %d (avg. frame duration: %.2f ms)",
+                         frame_counter, 1000.0 / frame_counter);
+            SDL_SetWindowTitle(window, buf);
             frame_counter = 0;
         }
 
@@ -134,6 +177,7 @@ int main(void) {
     }
 
     gemini_response_free(res);
+    SDL_DestroyTexture(gemtext_texture);
 
     text_renderer_free();
     SDL_DestroyRenderer(renderer);
@@ -160,14 +204,17 @@ int get_refresh_rate(SDL_Window *window) {
 }
 
 // Returns true on success, scaleX and scaleY are filled.
-bool get_scale(SDL_Window *window, SDL_Renderer *renderer, float *scaleX, float *scaleY) {
+bool get_scale(SDL_Window *window, SDL_Renderer *renderer,
+               float *scale_x, float *scale_y) {
     int logical_width, logical_height;
     SDL_GetWindowSize(window, &logical_width, &logical_height);
     int physical_width, physical_height;
-    if (SDL_GetRendererOutputSize(renderer, &physical_width, &physical_height)) {
+    if (SDL_GetRendererOutputSize(renderer,
+                                  &physical_width,
+                                  &physical_height)) {
         return false;
     }
-    *scaleX = (float) physical_width / (float) logical_width;
-    *scaleY = (float) physical_height / (float) logical_height;
+    *scale_x = (float) physical_width / (float) logical_width;
+    *scale_y = (float) physical_height / (float) logical_height;
     return true;
 }

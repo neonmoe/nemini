@@ -8,6 +8,7 @@
 
 enum nemini_error text_renderer_init(void);
 void text_renderer_free(void);
-enum nemini_error text_render(const char *input, SDL_Texture **output);
+enum nemini_error text_render(SDL_Surface **result, const char *text,
+                              int width, float scale);
 
 #endif

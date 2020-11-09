@@ -2,9 +2,10 @@
 # TODO: Add flag parsing and take into account --bindir, --libdir, --prefix and --debug
 
 # -D_POSIX_C_SOURCE=200112L is required by getaddrinfo() and the gang.
-CFLAGS="-D_POSIX_C_SOURCE=200112L $(pkg-config --cflags sdl2 libssl libcrypto) $CFLAGS"
+CFLAGS="-fno-strict-aliasing -D_POSIX_C_SOURCE=200112L $(pkg-config --cflags sdl2 libssl libcrypto) $CFLAGS"
 if [ "$1" = "--debug" ]; then
-    CFLAGS="-Og -ggdb -Wall -Wextra -Wpedantic --std=c99 $CFLAGS"
+    # C is unsafe: I want to hear every complaint the compiler can come up with.
+    CFLAGS="-Og -ggdb -Wall -Wextra -Wpedantic -fanalyzer --std=c99 $CFLAGS"
 else
     CFLAGS="-O2 $CFLAGS"
 fi
