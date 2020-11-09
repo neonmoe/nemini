@@ -5,6 +5,10 @@ A [Gemini](https://gemini.circumlunar.space/) client written in C with
 libraries](https://github.com/nothings/stb), for Linux and MS Windows,
 as well as presumably everything else¹.
 
+If you think this project sounds interesting, you should check out
+[Lagrange](https://gmi.skyjake.fi/lagrange/) as well. It's a very
+similar client, built in C with SDL, and has support for Gopher!
+
 ¹ Namely, operating systems with an SDL 2.0 port. Check out the list
 [here](https://wiki.libsdl.org/Installation#Supported_platforms).
 
@@ -13,15 +17,17 @@ as well as presumably everything else¹.
 [stb_truetype.h](src/stb_truetype.h) is used for text rendering. As it
 mentions in a comment at the start, it doesn't check offsets found in
 the font files it reads, which could lead to this program reading
-arbitrary memory.
+arbitrary memory. TODO: Provide a way to set the default font.
 
-TODO: Provide a way to set the default font.
+As a general consideration, you should probably avoid handling
+sensitive data with this application: while it is written with care,
+it is also the first relatively complicated C program I've ever
+written, so there probably are vulnerabilities all over the place.
 
 ## Building
 
-All the build files are hand-written and very short, please
-familiarize yourself with them if you intend to package this software
-for others.
+All the build files are hand-written and very short, so feel free to
+study them if you come across issues.
 
 ### Linux, probably other POSIX systems
 
