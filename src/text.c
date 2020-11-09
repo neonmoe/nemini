@@ -38,8 +38,14 @@ static unsigned char *font_data;
 static stbtt_fontinfo font_info;
 enum nemini_error text_renderer_init(void) {
     // TODO: System font hunting.
+#if _WIN32
+    const char *path = "c:/windows/fonts/times.ttf";
+#else
     const char *path = "/usr/share/fonts/adobe-source-sans-pro/SourceSansPro-Regular.otf";
+#endif
     SDL_RWops *file = SDL_RWFromFile(path, "rb");
+
+    if (file == NULL) { return ERR_SDL; }
 
     long size = SDL_RWsize(file);
     if (size < 0) { return ERR_SDL; }
