@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <SDL.h>
+#include "stretchy_buffer.h"
+
 #include "error.h"
 #include "str.h"
-#include "stretchy_buffer.h"
 #include "ctx.h"
 
 #define STBTT_ifloor(x) ((int) SDL_floor(x))
@@ -75,8 +76,36 @@ enum line_type {
 // differentiate them from actual visual lines.
 struct text_paragraph {
     struct nemini_string string;
+    struct nemini_string link; // Empty for all lines except links.
     enum line_type type;
 };
+
+// Returns the substring of string found after skipping whitespace
+// after index "offset". I.e. for the string "#   foo" with offset 1
+// would return "foo".
+static struct nemini_string get_after_whitespace(struct nemini_string string, int offset) {
+    int result_offset = offset;
+    for (unsigned int i = offset; i < string.length; i++) {
+        char c = string.ptr[i];
+        if (c != ' ' && c != '\t') {
+            result_offset = i;
+            break;
+        }
+    }
+    return nemini_substring(string, result_offset, string.length - result_offset);
+}
+
+// Returns the index of the first whitespace character in the given
+// string. If there's no whitespace, returns -1.
+static int find_whitespace_index(struct nemini_string string) {
+    for (int i = 0; i < (int) string.length; i++) {
+        char c = string.ptr[i];
+        if (c == ' ' || c == '\t') {
+            return i;
+        }
+    }
+    return -1;
+}
 
 static enum nemini_error text_paragraphize(struct nemini_string string,
                                            struct text_paragraph **result) {
@@ -87,28 +116,38 @@ static enum nemini_error text_paragraphize(struct nemini_string string,
     for (unsigned int i = 0; i < string.length; i++) {
         if (string.ptr[i] == '\n') {
             struct text_paragraph paragraph = {0};
-            enum nemini_error err;
-            err = nemini_string_substring(string, &paragraph.string,
-                                          start, i - start);
-            if (err != ERR_NONE) {
-                sb_free(paragraphs);
-                return err;
-            }
+            paragraph.string = nemini_substring(string, start, i - start);
+            paragraph.link = paragraph.string;
+            paragraph.link.length = 0;
 
             start = i + 1;
             if (nemini_string_start_matches(paragraph.string, "=>")) {
                 paragraph.type = GEMINI_LINK;
+                paragraph.link = get_after_whitespace(paragraph.string, 2);
+                int title_index = find_whitespace_index(paragraph.link);
+                if (title_index != -1) {
+                    paragraph.string = get_after_whitespace(paragraph.link,
+                                                            title_index);
+                } else {
+                    paragraph.string = paragraph.link;
+                }
             } else if (nemini_string_start_matches(paragraph.string, "```")) {
                 preformatted = !preformatted;
                 continue;
             } else if (nemini_string_start_matches(paragraph.string, "#")) {
+                int offset;
                 if (paragraph.string.ptr[1] != '#') {
                     paragraph.type = GEMINI_HEADING_BIG;
+                    offset = 2;
                 } else if (paragraph.string.ptr[2] != '#') {
                     paragraph.type = GEMINI_HEADING_MEDIUM;
+                    offset = 3;
                 } else {
                     paragraph.type = GEMINI_HEADING_SMALL;
+                    offset = 4;
                 }
+                paragraph.string =
+                    get_after_whitespace(paragraph.string, offset);
             } else if (nemini_string_start_matches(paragraph.string, "* ")) {
                 paragraph.type = GEMINI_UNORDERED_LIST;
             } else if (nemini_string_start_matches(paragraph.string, ">")) {
@@ -203,8 +242,19 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
                           &dash_x0, &dash_y0, &dash_x1, &dash_y1);
     float breaking_margin = sf * (dash_x1 - dash_x0);
 
+    // The rightwards double arrow is used, if found in the font.
+    int link_arrow_glyph_index;
+    link_arrow_glyph_index = stbtt_FindGlyphIndex(&font_info, 0x21D2);
+    if (link_arrow_glyph_index == 0) {
+        // If there's no double arrow, we'll use a greater-than.
+        link_arrow_glyph_index = stbtt_FindGlyphIndex(&font_info, 0x3E);
+        // If that doesn't exist in the font, let it be an empty glyph.
+    }
+
     unsigned int paragraphs_count = sb_count(paragraphs);
 
+    // TODO: Collect glyph indices & cursor positions into a list while laying out, render after
+    // (Then height can be accurately measured on the first try as well.)
     int initial_height = line_skip * paragraphs_count;
     SDL_Surface *surface = NULL;
     surface = SDL_CreateRGBSurfaceWithFormat(0, width, initial_height,
@@ -254,7 +304,10 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
             rect.h = by1 - by0;
 
             if (rect.x + rect.w > width) {
-                i = bad_breaking_index;
+                unsigned int back_up_to = bad_breaking_index;
+                for (; i > back_up_to; i--) {
+                    // Pop glyph at i
+                }
                 x_cursor = 0;
                 y_cursor += line_skip;
                 continue;

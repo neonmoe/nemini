@@ -17,20 +17,19 @@ enum nemini_error nemini_string_from(const char *cstring,
     return ERR_NONE;
 }
 
-enum nemini_error nemini_string_substring(struct nemini_string original,
-                                          struct nemini_string *output,
-                                          unsigned int index,
-                                          unsigned int length) {
+struct nemini_string nemini_substring(struct nemini_string original,
+                                      unsigned int index,
+                                      unsigned int length) {
     if (index >= original.length) {
-        return ERR_SUBSTR_OFFSET_OUT_OF_BOUNDS;
-    } else if (index + length >= original.length) {
-        return ERR_SUBSTR_LENGTH_OUT_OF_BOUNDS;
+        index = original.length - 1;
+    }
+    if (index + length >= original.length) {
+        length = original.length - index;
     }
     struct nemini_string result = {0};
     result.ptr = &original.ptr[index];
     result.length = length;
-    *output = result;
-    return ERR_NONE;
+    return result;
 }
 
 bool nemini_string_start_matches(struct nemini_string string, const char *cmp) {

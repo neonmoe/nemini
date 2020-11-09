@@ -19,13 +19,16 @@ struct nemini_string {
 enum nemini_error nemini_string_from(const char *cstring,
                                      struct nemini_string *result);
 
-enum nemini_error nemini_string_substring(struct nemini_string original,
-                                          struct nemini_string *result,
-                                          unsigned int index,
-                                          unsigned int length);
+// Index is clamped between the start and end of the original string,
+// and length is cut off at the end of the original string if it would
+// overflow.
+struct nemini_string nemini_substring(struct nemini_string original,
+                                      unsigned int index,
+                                      unsigned int length);
 
 // Compares the nemini_string to the given c string, returning true if
 // the start of the nemini_string matches.
-bool nemini_string_start_matches(struct nemini_string string, const char *cmp);
+bool nemini_string_start_matches(struct nemini_string string,
+                                 const char *cmp);
 
 #endif
