@@ -7,6 +7,7 @@
 #include "error.h"
 #include "str.h"
 #include "ctx.h"
+#include "font.ttf.h"
 
 #define STBTT_ifloor(x) ((int) SDL_floor(x))
 #define STBTT_iceil(x) ((int) SDL_ceil(x))
@@ -34,36 +35,14 @@
 #pragma GCC diagnostic pop
 
 
-static unsigned char *font_data;
 static stbtt_fontinfo font_info;
 enum nemini_error text_renderer_init(void) {
-    // TODO: System font hunting.
-#if _WIN32
-    const char *path = "c:/windows/fonts/times.ttf";
-#else
-    const char *path = "/usr/share/fonts/adobe-source-sans-pro/SourceSansPro-Regular.otf";
-#endif
-    SDL_RWops *file = SDL_RWFromFile(path, "rb");
-
-    if (file == NULL) { return ERR_SDL; }
-
-    long size = SDL_RWsize(file);
-    if (size < 0) { return ERR_SDL; }
-
-    font_data = SDL_malloc(size);
-    if (font_data == NULL) { return ERR_OUT_OF_MEMORY; }
-
-    int read = SDL_RWread(file, font_data, size, 1);
-    if (read != 1) { return ERR_SDL; }
-
-    int init_status = stbtt_InitFont(&font_info, font_data, 0);
+    int init_status = stbtt_InitFont(&font_info, atkinson_hyperlegible_font, 0);
     if (init_status == 0) { return ERR_STBTT_INIT_FAIL; }
-
     return ERR_NONE;
 }
 
 void text_renderer_free(void) {
-    SDL_free(font_data);
 }
 
 enum line_type {
