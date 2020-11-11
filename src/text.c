@@ -1,13 +1,28 @@
 // SPDX-FileCopyrightText: 2020 Jens Pitkanen <jens@neon.moe>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// This file contains text rendering functionality based on
+// stb_truetype.h and the Atkinsons Hyperlegible & Adobe Source Code
+// Pro fonts.
+//
+// Pro: this should work *everywhere*, there's nothing system-specific
+// here.
+//
+// Con: the fonts take space from the executable, and system-specific
+// font rendering libraries would probably do a better job at
+// rendering the text, especially when it comes to non-Latin scripts.
+//
+// But hey, pretty good text rendering for a small amount of code.
+
 #include <SDL.h>
 #include "stretchy_buffer.h"
 
 #include "error.h"
 #include "str.h"
 #include "ctx.h"
-#include "font.ttf.h"
+
+#include "font_atkinson.ttf.h"
+#include "font_mono.ttf.h"
 
 #define STBTT_ifloor(x) ((int) SDL_floor(x))
 #define STBTT_iceil(x) ((int) SDL_ceil(x))
@@ -35,9 +50,11 @@
 #pragma GCC diagnostic pop
 
 
-static stbtt_fontinfo font_info;
+static stbtt_fontinfo default_font, mono_font;
 enum nemini_error text_renderer_init(void) {
-    int init_status = stbtt_InitFont(&font_info, atkinson_hyperlegible_font, 0);
+    int init_status = stbtt_InitFont(&default_font, atkinson_hyperlegible_font, 0);
+    if (init_status == 0) { return ERR_STBTT_INIT_FAIL; }
+    init_status = stbtt_InitFont(&mono_font, source_code_pro_font, 0);
     if (init_status == 0) { return ERR_STBTT_INIT_FAIL; }
     return ERR_NONE;
 }
@@ -216,25 +233,20 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
         return paragraphize_status;
     }
 
-    float sf = stbtt_ScaleForMappingEmToPixels(&font_info, 16 * scale);
+    float sf = stbtt_ScaleForMappingEmToPixels(&default_font, 16 * scale);
     int ascent, descent, line_gap;
-    stbtt_GetFontVMetrics(&font_info, &ascent, &descent, &line_gap);
+    stbtt_GetFontVMetrics(&default_font, &ascent, &descent, &line_gap);
     float line_skip = sf * (ascent - descent + line_gap);
     float y_cursor = sf * ascent;
 
     int dash_x0, dash_x1, dash_y0, dash_y1;
-    stbtt_GetCodepointBox(&font_info, '-',
+    stbtt_GetCodepointBox(&default_font, '-',
                           &dash_x0, &dash_y0, &dash_x1, &dash_y1);
     float breaking_margin = sf * (dash_x1 - dash_x0);
 
-    // The rightwards double arrow is used, if found in the font.
-    int link_arrow_glyph_index;
-    link_arrow_glyph_index = stbtt_FindGlyphIndex(&font_info, 0x21D2);
-    if (link_arrow_glyph_index == 0) {
-        // If there's no double arrow, we'll use a greater-than.
-        link_arrow_glyph_index = stbtt_FindGlyphIndex(&font_info, 0x3E);
-        // If that doesn't exist in the font, let it be an empty glyph.
-    }
+    // The rightwards double arrow is used to prefix links.
+    int link_arrow_glyph_index = stbtt_FindGlyphIndex(&mono_font, 0x21D2);
+    SDL_Log("Index: %d", link_arrow_glyph_index);
 
     unsigned int paragraphs_count = sb_count(paragraphs);
 
@@ -267,7 +279,7 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
             }
 
             int advance_raw, left_side_bearing_raw;
-            stbtt_GetCodepointHMetrics(&font_info, codepoint,
+            stbtt_GetCodepointHMetrics(&default_font, codepoint,
                                        &advance_raw, &left_side_bearing_raw);
             float adv = sf * advance_raw;
             float left_side_bearing = sf * left_side_bearing_raw;
@@ -278,7 +290,7 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
             // Relative, pixel-space coordinates for the bounding box
             // of the glyph.
             int bx0, bx1, by0, by1;
-            stbtt_GetCodepointBitmapBoxSubpixel(&font_info, codepoint, sf, sf,
+            stbtt_GetCodepointBitmapBoxSubpixel(&default_font, codepoint, sf, sf,
                                                 x_cursor - (int) x_cursor,
                                                 y_cursor - (int) y_cursor,
                                                 &bx0, &by0, &bx1, &by1);
@@ -300,7 +312,7 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
 
             int x_offset, y_offset, bm_width, bm_height;
             unsigned char *bitmap =
-                stbtt_GetCodepointBitmapSubpixel(&font_info, sf, sf,
+                stbtt_GetCodepointBitmapSubpixel(&default_font, sf, sf,
                                                  x_cursor - (int) x_cursor,
                                                  y_cursor - (int) y_cursor,
                                                  codepoint,
