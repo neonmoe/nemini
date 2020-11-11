@@ -65,6 +65,14 @@ so others can benefit from your working setup.
   - `core/openssl`
   - `core/glibc`
 
+#### TCC notes
+
+Nemini can be built with [tcc](https://bellard.org/tcc/)! With slight
+tweaks. Add `-DSDL_DISABLE_IMMINTRIN_H` to the CFLAGS variable in your
+Makefile, and change `-pthreads` in the LIBS variable to
+`-lpthreads`. To use tcc as your compiler, just set the CC environment
+variable, as you'd assume: `CC=tcc make`.
+
 ### Windows
 
 Prerequisites:
