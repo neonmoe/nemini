@@ -46,5 +46,5 @@ bool nemini_string_start_matches(struct nemini_string string, const char *cmp) {
             return false;
         }
     }
-    return false;
+    return cmp[string.length] == '\0';
 }
