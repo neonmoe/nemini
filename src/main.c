@@ -9,6 +9,7 @@
 #include "error.h"
 #include "gemini.h"
 #include "text.h"
+#include "browser.h"
 
 int get_refresh_rate(SDL_Window *);
 bool get_scale(SDL_Window *, SDL_Renderer *, float *, float *);
@@ -57,62 +58,13 @@ int main(int argc, char **argv) {
 
     SDL_SetWindowTitle(window, "Nemini");
 
-
-    // TODO: Move this entire section to a "load page" module (remember frees too)
-    // TODO: Actually parse the mime type
-    Uint32 response_start = SDL_GetTicks();
-    struct gemini_response res = {0};
-    SDL_Texture *gemtext_texture = NULL;
-    const char *url;
-    if (argc < 2) {
-        url = "gemini://192.168.1.106/";
+    browser_set_status(LOADING_CONNECTING);
+    if (argc >= 2) {
+        browser_start_loading(argv[1]);
     } else {
-        url = argv[1];
+        SDL_Log("Usage: %s <url>", argv[0]);
+        return 0;
     }
-    int result = net_request(url, &res);
-    if (result != ERR_NONE) {
-        char buffer[1024];
-        SDL_snprintf(buffer, 1024, "net_request() returned an error: %s",
-                     get_nemini_err_str(result));
-        SDL_Log("%s", buffer);
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
-                                 "error", buffer, window);
-        return 1;
-    }
-    SDL_Log("Got response in %.3f seconds", (SDL_GetTicks() - response_start) / 1000.0);
-    if (res.status / 10 != 2) {
-        SDL_Log("Response status is not 2X, not rendering into text.");
-    } else if (SDL_strcmp(res.meta.mime_type, "text/gemini") != 0) {
-        SDL_Log("Response status is not 2X, not rendering into text.");
-    } else {
-        Uint32 render_start = SDL_GetTicks();
-        float scale_x, scale_y;
-        get_scale(window, renderer, &scale_x, &scale_y);
-        SDL_Surface *surface = NULL;
-        result = text_render(&surface, res.body,
-                             (int)(600 * scale_x), scale_x);
-        if (result != ERR_NONE) {
-            char buffer[1024];
-            SDL_snprintf(buffer, 1024, "text_render() returned an error: %s (%d)",
-                         get_nemini_err_str(result), result);
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", buffer);
-            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR,
-                                     "error", buffer, window);
-            return 1;
-        } else if (surface == NULL) {
-            SDL_Log("Texture rendering still failed!");
-            return 1;
-        } else {
-            SDL_Log("Text rendered successfully in %.3f seconds", (SDL_GetTicks() - render_start) / 1000.0);
-            gemtext_texture = SDL_CreateTextureFromSurface(renderer, surface);
-            if (gemtext_texture == NULL) {
-                SDL_Log("Could not create texture from surface: %s", SDL_GetError());
-                return 1;
-            }
-            SDL_FreeSurface(surface);
-        }
-    }
-
 
     bool running = true;
     int refresh_rate = 60;
@@ -140,18 +92,47 @@ int main(int argc, char **argv) {
         SDL_SetRenderDrawColor(renderer, 0xDD, 0xDD, 0xDD, 0xDD);
         SDL_RenderClear(renderer);
 
-        Uint32 t_format;
-        int t_access, t_width, t_height;
-        SDL_QueryTexture(gemtext_texture, &t_format, &t_access,
-                         &t_width, &t_height);
-        t_width /= scale_x;
-        t_height /= scale_y;
-        SDL_Rect dst_rect = {0};
-        dst_rect.x = (width - t_width) / 2;
-        dst_rect.y = 8;
-        dst_rect.w = t_width;
-        dst_rect.h = t_height;
-        SDL_RenderCopy(renderer, gemtext_texture, NULL, &dst_rect);
+        enum loading_status page_status = browser_get_status();
+        if (page_status == LOADING_DONE) {
+            struct loaded_page *page = get_browser_page();
+
+            if (page->texture == NULL) {
+                page->texture = SDL_CreateTextureFromSurface(renderer, page->surface);
+                if (page->texture != NULL) {
+                    SDL_FreeSurface(page->surface);
+                    page->surface = NULL;
+                }
+            } else {
+                Uint32 t_format;
+                int t_access, t_width, t_height;
+                SDL_QueryTexture(page->texture, &t_format, &t_access,
+                                 &t_width, &t_height);
+                t_width /= scale_x;
+                t_height /= scale_y;
+                SDL_Rect dst_rect = {0};
+                dst_rect.x = (width - t_width) / 2;
+                dst_rect.y = 8;
+                dst_rect.w = t_width;
+                dst_rect.h = t_height;
+                SDL_RenderCopy(renderer, page->texture, NULL, &dst_rect);
+            }
+        } else {
+            SDL_SetRenderDrawColor(renderer, 0x55, 0xAA, 0x55, 0xBB);
+
+            for (int s = 0; s < LOADING_DONE; s++) {
+                SDL_Rect loading_rect = {0};
+                loading_rect.x = (width - 40 * LOADING_DONE) / 2
+                    + s * 40;
+                loading_rect.y = (height - 32) / 2;
+                loading_rect.w = 32;
+                loading_rect.h = 32;
+                if (s < (int)page_status) {
+                    SDL_RenderFillRect(renderer, &loading_rect);
+                } else {
+                    SDL_RenderDrawRect(renderer, &loading_rect);
+                }
+            }
+        }
 
         SDL_RenderPresent(renderer);
 
@@ -182,9 +163,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    gemini_response_free(res);
-    SDL_DestroyTexture(gemtext_texture);
-
+    browser_free();
     text_renderer_free();
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);

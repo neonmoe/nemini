@@ -13,6 +13,7 @@
 #include "socket.h"
 #include "url.h"
 #include "gemini.h"
+#include "browser.h"
 
 static SSL_CTX *ctx;
 
@@ -49,6 +50,8 @@ void net_free(void) {
 enum nemini_error net_request(const char *url, struct gemini_response *result) {
     enum nemini_error err = ERR_NONE;
 
+    browser_set_status(LOADING_CONNECTING);
+
     char *host, *port, *resource;
     int parse_status = parse_gemini_url(url, &host, &port, &resource);
     if (parse_status != ERR_NONE) { return parse_status; }
@@ -59,6 +62,8 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
         err = socket_status;
         goto free_up_to_url;
     }
+
+    browser_set_status(LOADING_ESTABLISHING_TLS);
 
     SSL *ssl = SSL_new(ctx);
     if (ssl == NULL) { return ERR_UNEXPECTED; }
@@ -97,6 +102,8 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
     BIO_set_ssl(bio_ssl, ssl, 0);
     BIO_push(bio_buffered, bio_ssl);
 
+    browser_set_status(LOADING_SENDING_REQUEST);
+
     int url_length = SDL_strlen(url);
     char *request = SDL_malloc(url_length + 3);
     SDL_memcpy(request, url, url_length);
@@ -105,6 +112,8 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
         err = ERR_PUT_REQUEST;
         goto free_up_to_bio;
     }
+
+    browser_set_status(LOADING_RECEIVING_HEADER);
 
     // Length: <STATUS><SPACE><META><CR><LF><NUL>
     char gemini_header[2 + 1 + 1024 + 1 + 1 + 1] = {0};
@@ -129,6 +138,8 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
     SDL_memcpy(meta, gemini_header + 3, meta_length);
     meta[meta_length] = '\0';
     res.meta.meta = meta;
+
+    browser_set_status(LOADING_RECEIVING_BODY);
 
     // Only input (2X) responses have a body.
     if (gemini_header[0] == '2') {

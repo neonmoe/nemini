@@ -13,7 +13,7 @@ fi
 rm Makefile
 echo "OUTDIR=./build-linux-$(uname -m)" >> Makefile
 echo "EXE=nemini" >> Makefile
-echo "OBJS=src/main.o src/net.o src/socket.o src/url.o src/error.o src/gemini.o src/text.o src/str.o" >> Makefile
+echo "OBJS=src/main.o src/net.o src/socket.o src/url.o src/error.o src/gemini.o src/text.o src/str.o src/browser.o" >> Makefile
 # See CFLAGS definition above
 echo "CFLAGS=$CFLAGS" >> Makefile
 echo "LIBS=$(pkg-config --libs sdl2 libssl libcrypto)" >> Makefile

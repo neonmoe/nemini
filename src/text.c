@@ -20,6 +20,8 @@
 #include "error.h"
 #include "str.h"
 #include "ctx.h"
+#include "text.h"
+#include "browser.h"
 
 #include "font_atkinson.ttf.h"
 #include "font_mono.ttf.h"
@@ -61,26 +63,6 @@ enum nemini_error text_renderer_init(void) {
 
 void text_renderer_free(void) {
 }
-
-enum line_type {
-    GEMINI_TEXT,
-    GEMINI_LINK,
-    GEMINI_PREFORMATTED,
-    GEMINI_HEADING_BIG,
-    GEMINI_HEADING_MEDIUM,
-    GEMINI_HEADING_SMALL,
-    GEMINI_UNORDERED_LIST,
-    GEMINI_QUOTE,
-};
-
-// text/gemini is rendered one line at a time, with wrapping. The
-// "lines" from the Gemini spec are called paragraphs in Nemini, to
-// differentiate them from actual visual lines.
-struct text_paragraph {
-    struct nemini_string string;
-    struct nemini_string link; // Empty for all lines except links.
-    enum line_type type;
-};
 
 // Returns the substring of string found after skipping whitespace
 // after index "offset". I.e. for the string "#   foo" with offset 1
@@ -243,6 +225,8 @@ struct glyph_blueprint {
 
 enum nemini_error text_render(SDL_Surface **result, const char *text,
                               int width, float scale) {
+    browser_set_status(LOADING_LAYOUT);
+
     struct nemini_string string;
     enum nemini_error stringify_status = nemini_string_from(text, &string);
     if (stringify_status != ERR_NONE) {
@@ -408,6 +392,8 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
         x_cursor = 0;
     }
     sb_free(paragraphs);
+
+    browser_set_status(LOADING_RASTERIZING);
 
     int height = (int)y_cursor;
     SDL_Surface *surface = NULL;
