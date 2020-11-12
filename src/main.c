@@ -13,7 +13,7 @@
 int get_refresh_rate(SDL_Window *);
 bool get_scale(SDL_Window *, SDL_Renderer *, float *, float *);
 
-int main(void) {
+int main(int argc, char **argv) {
     int sockets_status = sockets_init();
     if (sockets_status != ERR_NONE) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -63,7 +63,13 @@ int main(void) {
     Uint32 response_start = SDL_GetTicks();
     struct gemini_response res = {0};
     SDL_Texture *gemtext_texture = NULL;
-    int result = net_request("gemini://192.168.1.106/", &res);
+    const char *url;
+    if (argc < 2) {
+        url = "gemini://192.168.1.106/";
+    } else {
+        url = argv[1];
+    }
+    int result = net_request(url, &res);
     if (result != ERR_NONE) {
         char buffer[1024];
         SDL_snprintf(buffer, 1024, "net_request() returned an error: %s",
@@ -97,13 +103,13 @@ int main(void) {
             SDL_Log("Texture rendering still failed!");
             return 1;
         } else {
+            SDL_Log("Text rendered successfully in %.3f seconds", (SDL_GetTicks() - render_start) / 1000.0);
             gemtext_texture = SDL_CreateTextureFromSurface(renderer, surface);
             if (gemtext_texture == NULL) {
                 SDL_Log("Could not create texture from surface: %s", SDL_GetError());
                 return 1;
             }
             SDL_FreeSurface(surface);
-            SDL_Log("Text rendered successfully in %.3f seconds", (SDL_GetTicks() - render_start) / 1000.0);
         }
     }
 

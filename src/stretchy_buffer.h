@@ -188,6 +188,9 @@
 
 #include <SDL.h>
 
+// Added for Nemini:
+#define sb_pop(a)              (--stb__sbn(a))
+
 #define stb_sb_free(a)         ((a) ? SDL_free(stb__sbraw(a)),0 : 0)
 #define stb_sb_push(a,v)       (stb__sbmaybegrow(a,1), (a)[stb__sbn(a)++] = (v))
 #define stb_sb_count(a)        ((a) ? stb__sbn(a) : 0)

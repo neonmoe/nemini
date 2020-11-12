@@ -140,13 +140,13 @@ static enum nemini_error text_paragraphize(struct nemini_string string,
                 int offset;
                 if (paragraph.string.ptr[1] != '#') {
                     paragraph.type = GEMINI_HEADING_BIG;
-                    offset = 2;
+                    offset = 1;
                 } else if (paragraph.string.ptr[2] != '#') {
                     paragraph.type = GEMINI_HEADING_MEDIUM;
-                    offset = 3;
+                    offset = 2;
                 } else {
                     paragraph.type = GEMINI_HEADING_SMALL;
-                    offset = 4;
+                    offset = 3;
                 }
                 paragraph.string =
                     get_after_whitespace(paragraph.string, offset);
@@ -181,7 +181,7 @@ static enum nemini_error get_unicode_codepoint(const char *ptr, int i,
     for (unsigned char byte = ptr[i]; byte != '\0'; byte = ptr[++i]) {
         if (bytes_needed == 0) {
             if (byte <= 0x7F) {
-                *char_width = 1;
+                if (char_width != NULL) { *char_width = 1; }
                 *codepoint = byte;
                 return ERR_NONE;
             } else if (byte >= 0xC2 && byte <= 0xDF) {
@@ -210,13 +210,26 @@ static enum nemini_error get_unicode_codepoint(const char *ptr, int i,
         codepoint_so_far = (codepoint_so_far << 6) | (byte & 0x3F);
         bytes_seen++;
         if (bytes_seen == bytes_needed) {
-            *char_width = bytes_needed + 1;
+            if (char_width != NULL) { *char_width = bytes_needed + 1; }
             *codepoint = codepoint_so_far;
             return ERR_NONE;
         }
     }
     return ERR_NOT_UTF8;
 }
+
+static bool codepoint_is_breaking(int codepoint) {
+    return codepoint == 0x20 /* space */
+        || codepoint == 0x2D /* hyphen-minus */;
+}
+
+struct glyph_blueprint {
+    struct stbtt_fontinfo *font;
+    int glyph_index;
+    enum line_type line_type;
+    float x_cursor;
+    float y_cursor;
+};
 
 enum nemini_error text_render(SDL_Surface **result, const char *text,
                               int width, float scale) {
@@ -246,26 +259,34 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
 
     // The rightwards double arrow is used to prefix links.
     int link_arrow_glyph_index = stbtt_FindGlyphIndex(&mono_font, 0x21D2);
+    int link_arrow_advance_raw, link_arrow_lsb_raw;
+    stbtt_GetGlyphHMetrics(&mono_font, link_arrow_glyph_index,
+                           &link_arrow_advance_raw,
+                           &link_arrow_lsb_raw);
+    float link_arrow_advance = sf * link_arrow_advance_raw;
     SDL_Log("Index: %d", link_arrow_glyph_index);
 
+    struct glyph_blueprint *glyphs = NULL;
     unsigned int paragraphs_count = sb_count(paragraphs);
-
-    // TODO: Collect glyph indices & cursor positions into a list while laying out, render after
-    // (Then height can be accurately measured on the first try as well.)
-    int initial_height = line_skip * paragraphs_count;
-    SDL_Surface *surface = NULL;
-    surface = SDL_CreateRGBSurfaceWithFormat(0, width, initial_height,
-                                             32, SDL_PIXELFORMAT_RGBA32);
-    SDL_LockSurface(surface);
 
     for (unsigned int par_i = 0; par_i < paragraphs_count; par_i++) {
         struct text_paragraph paragraph = paragraphs[par_i];
-
         unsigned int length = paragraph.string.length;
         unsigned int good_breaking_index = 0;
-        unsigned int ok_breaking_index = 0;
-        unsigned int bad_breaking_index = 0;
+        unsigned int bad_breaking_index = 1;
+        unsigned int bad_break_margin = (int)(width * 0.75);
         float x_cursor = 0;
+
+        if (paragraph.type == GEMINI_LINK) {
+            struct glyph_blueprint new_glyph = {0};
+            new_glyph.font = &mono_font;
+            new_glyph.glyph_index = link_arrow_glyph_index;
+            new_glyph.line_type = GEMINI_LINK;
+            new_glyph.x_cursor = x_cursor;
+            new_glyph.y_cursor = y_cursor;
+            sb_push(glyphs, new_glyph);
+            x_cursor += link_arrow_advance * 2;
+        }
 
         int char_width = 1;
         for (unsigned int i = 0; i < length; i += char_width) {
@@ -274,91 +295,138 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
             err = get_unicode_codepoint(paragraph.string.ptr, i,
                                         &codepoint, &char_width);
             if (err != ERR_NONE) {
+                sb_free(glyphs);
                 sb_free(paragraphs);
                 return err;
             }
 
-            int advance_raw, left_side_bearing_raw;
-            stbtt_GetCodepointHMetrics(&default_font, codepoint,
-                                       &advance_raw, &left_side_bearing_raw);
-            float adv = sf * advance_raw;
-            float left_side_bearing = sf * left_side_bearing_raw;
+            stbtt_fontinfo *font;
+            if (paragraph.type == GEMINI_PREFORMATTED) {
+                font = &mono_font;
+            } else {
+                font = &default_font;
+            }
+
+            int glyph_index = stbtt_FindGlyphIndex(font, codepoint);
+            int advance_raw, lsb_raw;
+            stbtt_GetGlyphHMetrics(font, glyph_index, &advance_raw, &lsb_raw);
+
+            int next_codepoint = -1;
+            get_unicode_codepoint(paragraph.string.ptr, i,
+                                  &next_codepoint, NULL);
+            int next_glyph_index = stbtt_FindGlyphIndex(font, next_codepoint);
+            int kerning_adv_raw = stbtt_GetGlyphKernAdvance(font, glyph_index,
+                                                            next_glyph_index);
+
+            float adv = sf * (advance_raw + kerning_adv_raw);
             if (SDL_ceil(x_cursor + adv + breaking_margin) < width) {
-                bad_breaking_index = i;
+                bad_breaking_index = i + 1;
+                if (x_cursor + adv > bad_break_margin
+                    && codepoint_is_breaking(codepoint)) {
+                    good_breaking_index = i;
+                }
             }
 
             // Relative, pixel-space coordinates for the bounding box
             // of the glyph.
             int bx0, bx1, by0, by1;
-            stbtt_GetCodepointBitmapBoxSubpixel(&default_font, codepoint, sf, sf,
-                                                x_cursor - (int) x_cursor,
-                                                y_cursor - (int) y_cursor,
-                                                &bx0, &by0, &bx1, &by1);
-            SDL_Rect rect = {0};
-            rect.x = (int)(left_side_bearing + x_cursor);
-            rect.y = by1 + y_cursor;
-            rect.w = bx1 - bx0;
-            rect.h = by1 - by0;
-
-            if (rect.x + rect.w > width) {
-                unsigned int back_up_to = bad_breaking_index;
+            stbtt_GetGlyphBitmapBoxSubpixel(&default_font, glyph_index, sf, sf,
+                                            x_cursor - (int) x_cursor,
+                                            y_cursor - (int) y_cursor,
+                                            &bx0, &by0, &bx1, &by1);
+            if (x_cursor + bx1 > width) {
+                unsigned int back_up_to;
+                if (good_breaking_index > 0) {
+                    back_up_to = good_breaking_index;
+                    good_breaking_index = 0;
+                } else {
+                    back_up_to = bad_breaking_index;
+                }
+                i--; // Current char was never pushed, doesn't need to be popped.
                 for (; i > back_up_to; i--) {
-                    // Pop glyph at i
+                    sb_pop(glyphs);
                 }
                 x_cursor = 0;
                 y_cursor += line_skip;
-                continue;
-            }
-
-            int x_offset, y_offset, bm_width, bm_height;
-            unsigned char *bitmap =
-                stbtt_GetCodepointBitmapSubpixel(&default_font, sf, sf,
-                                                 x_cursor - (int) x_cursor,
-                                                 y_cursor - (int) y_cursor,
-                                                 codepoint,
-                                                 &bm_width, &bm_height,
-                                                 &x_offset, &y_offset);
-
-            Uint8 bpp = surface->format->BytesPerPixel;
-            int pitch = surface->pitch;
-            int r_shift = surface->format->Rshift;
-            int g_shift = surface->format->Gshift;
-            int b_shift = surface->format->Bshift;
-            int a_shift = surface->format->Ashift;
-            unsigned int base_color;
-            if (paragraph.type == GEMINI_LINK) {
-                base_color = (0x11 << r_shift)
-                    | (0x14 << g_shift)
-                    | (0x88 << b_shift);
             } else {
-                base_color = (0x22 << r_shift)
-                    | (0x22 << g_shift)
-                    | (0x22 << b_shift);
+                struct glyph_blueprint new_glyph = {0};
+                new_glyph.font = font;
+                new_glyph.glyph_index = glyph_index;
+                new_glyph.line_type = paragraph.type;
+                new_glyph.x_cursor = x_cursor;
+                new_glyph.y_cursor = y_cursor;
+                sb_push(glyphs, new_glyph);
+
+                x_cursor += adv;
             }
-
-            for (int y = 0; y < bm_height; y++) {
-                int f_y = y + y_cursor + y_offset;
-                if (f_y < 0 || f_y >= initial_height) { continue; }
-
-                for (int x = 0; x < bm_width; x++) {
-                    int f_x = x + x_cursor + x_offset;
-                    if (f_x < 0 || f_x >= width) { continue; }
-
-                    unsigned int color = base_color
-                        | bitmap[x + y * bm_width] << a_shift;
-                    unsigned int idx = f_x + f_y * pitch / bpp;
-                    ((unsigned int *)surface->pixels)[idx] = color;
-                }
-            }
-            stbtt_FreeBitmap(bitmap, NULL);
-
-            x_cursor += adv;
         }
         y_cursor += line_skip;
         x_cursor = 0;
     }
     sb_free(paragraphs);
+
+    int height = (int)y_cursor;
+    SDL_Surface *surface = NULL;
+    surface = SDL_CreateRGBSurfaceWithFormat(0, width, height, 32,
+                                             SDL_PIXELFORMAT_RGBA32);
+    SDL_LockSurface(surface);
+
+    unsigned int glyphs_count = sb_count(glyphs);
+    for (unsigned int i = 0; i < glyphs_count; i++) {
+        struct glyph_blueprint glyph = glyphs[i];
+
+        float x_cursor_fract = glyph.x_cursor - (int) glyph.x_cursor;
+        float y_cursor_fract = glyph.y_cursor - (int) glyph.y_cursor;
+        int x_offset, y_offset, bm_width, bm_height;
+        unsigned char *bitmap =
+            stbtt_GetGlyphBitmapSubpixel(glyph.font, sf, sf,
+                                         x_cursor_fract,
+                                         y_cursor_fract,
+                                         glyph.glyph_index,
+                                         &bm_width, &bm_height,
+                                         &x_offset, &y_offset);
+
+        Uint8 bpp = surface->format->BytesPerPixel;
+        int pitch = surface->pitch / bpp; // pitch in pixels, not bytes
+        int r_shift = surface->format->Rshift;
+        int g_shift = surface->format->Gshift;
+        int b_shift = surface->format->Bshift;
+        int a_shift = surface->format->Ashift;
+        int a_mask = surface->format->Amask;
+        unsigned int *surf_pixels = (unsigned int *)surface->pixels;
+
+        unsigned int base_color;
+        if (glyph.line_type == GEMINI_LINK) {
+            base_color = (0x11 << r_shift)
+                | (0x14 << g_shift)
+                | (0x88 << b_shift);
+        } else {
+            base_color = (0x22 << r_shift)
+                | (0x22 << g_shift)
+                | (0x22 << b_shift);
+        }
+
+        for (int y = 0; y < bm_height; y++) {
+            int f_y = y + glyph.y_cursor + y_offset;
+            if (f_y < 0 || f_y >= height) { continue; }
+
+            for (int x = 0; x < bm_width; x++) {
+                int f_x = x + glyph.x_cursor + x_offset;
+                if (f_x < 0 || f_x >= width) { continue; }
+
+                unsigned int bm_idx = x + y * bm_width;
+                unsigned int idx = f_x + f_y * pitch;
+                int orig_alpha = (int)((surf_pixels[idx] >> a_shift) & 0xFF);
+                int summed_alpha = (int)bitmap[bm_idx] + orig_alpha;
+                unsigned char final_alpha = SDL_min(0xFF, summed_alpha);
+                surf_pixels[idx] = base_color | (final_alpha << a_shift);
+            }
+        }
+        stbtt_FreeBitmap(bitmap, NULL);
+    }
+
     SDL_UnlockSurface(surface);
+    sb_free(glyphs);
     *result = surface;
 
     return ERR_NONE;
