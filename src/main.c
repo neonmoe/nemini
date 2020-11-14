@@ -14,6 +14,8 @@
 
 int get_refresh_rate(SDL_Window *);
 bool get_scale(SDL_Window *, SDL_Renderer *, float *, float *);
+int get_desired_content_width(int, float);
+float lerp(float, float, float);
 
 int main(int argc, char **argv) {
     SDL_RWops *loading_img = SDL_RWFromMem((void *)loading_image_bmp,
@@ -100,11 +102,15 @@ int main(int argc, char **argv) {
         int width, height;
         SDL_GetRendererOutputSize(renderer, &width, &height);
 
-        browser_start_loading(argv[1], width, scale_x);
+        int content_width = get_desired_content_width(width, scale_x);
+        browser_start_loading(argv[1], content_width, scale_x);
     } else {
         SDL_Log("Usage: %s <url>", argv[0]);
         return 0;
     }
+
+    // For lerps:
+    float loading_bar_width = 0;
 
     bool running = true;
     int refresh_rate = 60;
@@ -129,11 +135,14 @@ int main(int argc, char **argv) {
         SDL_GetRendererOutputSize(renderer, &width, &height);
         width /= scale_x;
         height /= scale_y;
-        SDL_SetRenderDrawColor(renderer, 0xDD, 0xDD, 0xDD, 0xDD);
+        int bg_r = 0xDD;
+        int bg_g = 0xDD;
+        int bg_b = 0xDD;
+        SDL_SetRenderDrawColor(renderer, bg_r, bg_g, bg_b, 0xFF);
         SDL_RenderClear(renderer);
 
         struct loaded_page *page = browser_get_page();
-        if (page->texture != NULL || page->status == LOADING_DONE) {
+        if (page->texture != NULL || page->surface != NULL) {
             if (page->surface != NULL) {
                 if (page->texture != NULL) {
                     SDL_DestroyTexture(page->texture);
@@ -152,9 +161,7 @@ int main(int argc, char **argv) {
                 SDL_QueryTexture(page->texture, &t_format, &t_access,
                                  &t_width, &t_height);
 
-                int desired_width = (int)(width * scale_x)
-                    - ((int)(width * scale_x) % 100);
-                desired_width = SDL_min(500, SDL_max(100, desired_width));
+                int desired_width = get_desired_content_width(width, scale_x);
                 if (t_width != desired_width) {
                     browser_redraw_page(page, desired_width, scale_x);
                 }
@@ -163,12 +170,14 @@ int main(int argc, char **argv) {
                 t_height /= scale_y;
                 SDL_Rect dst_rect = {0};
                 dst_rect.x = (width - t_width) / 2;
-                dst_rect.y = 8;
+                dst_rect.y = 64;
                 dst_rect.w = t_width;
                 dst_rect.h = t_height;
                 SDL_RenderCopy(renderer, page->texture, NULL, &dst_rect);
             }
-        } else {
+        }
+
+        if (page->status != LOADING_DONE) {
             bool is_err = page->error != ERR_NONE;
             if (is_err) {
                 char str[1024];
@@ -176,7 +185,6 @@ int main(int argc, char **argv) {
                              get_nemini_err_str(page->error));
                 SDL_Texture *err_tex;
                 err_tex = text_cached_render(renderer, str, scale_x);
-
                 Uint32 t_format;
                 int t_access, t_width, t_height;
                 SDL_QueryTexture(err_tex, &t_format, &t_access,
@@ -185,9 +193,11 @@ int main(int argc, char **argv) {
                 t_height /= scale_y;
                 SDL_Rect dst_rect = {0};
                 dst_rect.x = (width - t_width) / 2;
-                dst_rect.y = height / 2 - t_height - 4;
+                dst_rect.y = 8;
                 dst_rect.w = t_width;
                 dst_rect.h = t_height;
+                SDL_SetRenderDrawColor(renderer, bg_r, bg_g, bg_b, 0xFF);
+                SDL_RenderFillRect(renderer, &dst_rect);
                 SDL_RenderCopy(renderer, err_tex, NULL, &dst_rect);
 
                 SDL_SetRenderDrawColor(renderer, 0xDD, 0x33, 0x33, 0xBB);
@@ -195,19 +205,19 @@ int main(int argc, char **argv) {
                 SDL_SetRenderDrawColor(renderer, 0x55, 0xAA, 0x55, 0xBB);
             }
 
-            for (int s = 0; s < LOADING_DONE; s++) {
-                SDL_Rect loading_rect = {0};
-                loading_rect.x = (width - 40 * LOADING_DONE) / 2
-                    + s * 40 + 4;
-                loading_rect.y = height / 2;
-                loading_rect.w = 32;
-                loading_rect.h = 32;
-                if (s < (int)(page->status) || is_err) {
-                    SDL_RenderFillRect(renderer, &loading_rect);
-                } else {
-                    SDL_RenderDrawRect(renderer, &loading_rect);
-                }
+            SDL_Rect loading_rect = {0};
+            loading_rect.x = 0;
+            loading_rect.y = 0;
+            if (is_err) {
+                loading_rect.w = width;
+            } else {
+                float target = width * (int)page->status / (LOADING_DONE - 1);
+                loading_bar_width = lerp(loading_bar_width, target,
+                                         7.5 / refresh_rate);
+                loading_rect.w = loading_bar_width;
             }
+            loading_rect.h = 8;
+            SDL_RenderFillRect(renderer, &loading_rect);
         }
 
         SDL_RenderPresent(renderer);
@@ -278,4 +288,14 @@ bool get_scale(SDL_Window *window, SDL_Renderer *renderer,
     *scale_x = (float) physical_width / (float) logical_width;
     *scale_y = (float) physical_height / (float) logical_height;
     return true;
+}
+
+int get_desired_content_width(int width, float scale) {
+    int desired_width = (int)(width * scale)
+        - ((int)(width * scale) % 50) - 20;
+    return SDL_min(500, SDL_max(100, desired_width));
+}
+
+float lerp(float from, float to, float a) {
+    return from + (to - from) * SDL_max(SDL_min(a, 1), 0);
 }

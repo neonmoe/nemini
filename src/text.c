@@ -161,7 +161,7 @@ static enum nemini_error get_unicode_codepoint(const char *ptr, int i,
         if (bytes_needed == 0) {
             if (byte <= 0x7F) {
                 if (char_width != NULL) { *char_width = 1; }
-                *codepoint = byte;
+                if (codepoint != NULL) { *codepoint = byte; }
                 return ERR_NONE;
             } else if (byte >= 0xC2 && byte <= 0xDF) {
                 bytes_needed = 1;
@@ -190,7 +190,7 @@ static enum nemini_error get_unicode_codepoint(const char *ptr, int i,
         bytes_seen++;
         if (bytes_seen == bytes_needed) {
             if (char_width != NULL) { *char_width = bytes_needed + 1; }
-            *codepoint = codepoint_so_far;
+            if (codepoint != NULL) { *codepoint = codepoint_so_far; }
             return ERR_NONE;
         }
     }
@@ -420,7 +420,7 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
 
             float adv = sf * (advance_raw + kerning_adv_raw);
             if (SDL_ceil(x_cursor + adv + breaking_margin) < width) {
-                bad_breaking_index = i + 1;
+                bad_breaking_index = i + char_width;
                 if (x_cursor + adv > bad_break_margin
                     && codepoint_is_breaking(codepoint)) {
                     good_breaking_index = i;
@@ -458,6 +458,9 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
                 for (; i > back_up_to; i--) {
                     sb_pop(glyphs);
                 }
+                // After moving the index, recalculate the char width
+                get_unicode_codepoint(paragraph.string.ptr, i,
+                                      NULL, &char_width);
 
                 x_cursor = 0;
                 y_cursor += sf * (ascent - descent + line_gap);
