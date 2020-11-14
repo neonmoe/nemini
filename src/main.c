@@ -40,6 +40,7 @@ int main(int argc, char **argv) {
                      SDL_GetError());
         return 1;
     }
+    SDL_SetWindowMinimumSize(window, 320, 240);
 
     SDL_Surface *window_surf = SDL_GetWindowSurface(window);
     if (window_surf != NULL) {

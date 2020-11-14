@@ -104,15 +104,12 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
 
     browser_set_status(LOADING_SENDING_REQUEST);
 
-    int url_length = SDL_strlen(url);
-    char *request = SDL_malloc(url_length + 3);
-    SDL_memcpy(request, url, url_length);
-    SDL_memcpy(request + url_length, "\r\n\0", 3);
+    char request[1024];
+    SDL_snprintf(request, 1024, "gemini://%s:%s%s\r\n", host, port, resource);
     if (BIO_puts(bio_ssl, request) == -1) {
         err = ERR_PUT_REQUEST;
         goto free_up_to_bio;
     }
-    SDL_free(request);
 
     browser_set_status(LOADING_RECEIVING_HEADER);
 

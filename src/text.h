@@ -27,11 +27,22 @@ struct text_paragraph {
     enum line_type type;
 };
 
+struct link_box {
+    SDL_Rect rect;
+    char *link;
+};
+
+struct text_interactable {
+    struct link_box *links;
+};
+
 enum nemini_error text_renderer_init(void);
 void text_renderer_free(void);
 enum nemini_error text_render(SDL_Surface **result,
+                              struct text_interactable *interactable,
                               const char *text, int width, float scale);
 SDL_Texture *text_cached_render(SDL_Renderer *renderer,
                                 const char *text, float scale);
+void text_interactable_free(struct text_interactable interactable);
 
 #endif

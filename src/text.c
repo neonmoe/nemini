@@ -94,8 +94,8 @@ static enum nemini_error text_paragraphize(struct nemini_string string,
 
     bool preformatted = false;
     unsigned int start = 0;
-    for (unsigned int i = 0; i < string.length; i++) {
-        if (string.ptr[i] == '\n') {
+    for (unsigned int i = 0; i <= string.length; i++) {
+        if (string.ptr[i] == '\n' || i == string.length) {
             struct text_paragraph paragraph = {0};
             paragraph.string = nemini_substring(string, start, i - start);
             paragraph.link = paragraph.string;
@@ -309,8 +309,9 @@ SDL_Surface *render_glyphs(struct glyph_blueprint *glyphs,
     return surface;
 }
 
-enum nemini_error text_render(SDL_Surface **result, const char *text,
-                              int width, float scale) {
+enum nemini_error text_render(SDL_Surface **result,
+                              struct text_interactable *result_interactable,
+                              const char *text, int width, float scale) {
     browser_set_status(LOADING_LAYOUT);
 
     struct nemini_string string;
@@ -332,6 +333,9 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
     stbtt_GetGlyphHMetrics(&mono_font, link_arrow_glyph_index,
                            &link_arrow_advance_raw,
                            &link_arrow_lsb_raw);
+
+    struct text_interactable interactable = {0};
+    interactable.links = NULL;
 
     float y_cursor = 0;
     struct glyph_blueprint *glyphs = NULL;
@@ -366,6 +370,8 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
         unsigned int bad_breaking_index = 1;
         unsigned int bad_break_margin = (int)(width - 64);
 
+        float line_start_y = y_cursor;
+        float line_end_x = 0;
         float x_cursor = 0;
         y_cursor += paragraph_sf * ascent;
 
@@ -390,6 +396,7 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
             if (err != ERR_NONE) {
                 sb_free(glyphs);
                 sb_free(paragraphs);
+                text_interactable_free(interactable);
                 return err;
             }
 
@@ -475,10 +482,23 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
                 sb_push(glyphs, new_glyph);
 
                 x_cursor += adv;
+                line_end_x = SDL_max(line_end_x, x_cursor);
             }
         }
         y_cursor += paragraph_sf * (-descent + line_gap);
         x_cursor = 0;
+
+        if (paragraph.type == GEMINI_LINK) {
+            struct link_box link = {0};
+            link.rect.x = 0;
+            link.rect.y = line_start_y;
+            link.rect.w = line_end_x;
+            link.rect.h = y_cursor - line_start_y;
+            link.link = SDL_malloc(paragraph.link.length + 1);
+            SDL_memcpy(link.link, paragraph.link.ptr, paragraph.link.length);
+            link.link[paragraph.link.length] = '\0';
+            sb_push(interactable.links, link);
+        }
     }
     sb_free(paragraphs);
 
@@ -487,6 +507,8 @@ enum nemini_error text_render(SDL_Surface **result, const char *text,
     int height = (int)y_cursor;
     SDL_Surface *surface = render_glyphs(glyphs, width, height);
     sb_free(glyphs);
+
+    *result_interactable = interactable;
     *result = surface;
 
     return ERR_NONE;
@@ -591,4 +613,12 @@ void text_renderer_free(void) {
         SDL_free(tex.text);
         SDL_DestroyTexture(tex.texture);
     }
+}
+
+void text_interactable_free(struct text_interactable interactable) {
+    int link_count = sb_count(interactable.links);
+    for (int i = 0; i < link_count; i++) {
+        SDL_free(interactable.links[i].link);
+    }
+    sb_free(interactable.links);
 }
