@@ -31,5 +31,7 @@ enum nemini_error text_renderer_init(void);
 void text_renderer_free(void);
 enum nemini_error text_render(SDL_Surface **result,
                               const char *text, int width, float scale);
+SDL_Texture *text_cached_render(SDL_Renderer *renderer,
+                                const char *text, float scale);
 
 #endif

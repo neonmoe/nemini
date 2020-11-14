@@ -171,6 +171,25 @@ int main(int argc, char **argv) {
         } else {
             bool is_err = page->error != ERR_NONE;
             if (is_err) {
+                char str[1024];
+                SDL_snprintf(str, 1024, "Error: %s",
+                             get_nemini_err_str(page->error));
+                SDL_Texture *err_tex;
+                err_tex = text_cached_render(renderer, str, scale_x);
+
+                Uint32 t_format;
+                int t_access, t_width, t_height;
+                SDL_QueryTexture(err_tex, &t_format, &t_access,
+                                 &t_width, &t_height);
+                t_width /= scale_x;
+                t_height /= scale_y;
+                SDL_Rect dst_rect = {0};
+                dst_rect.x = (width - t_width) / 2;
+                dst_rect.y = height / 2 - t_height - 4;
+                dst_rect.w = t_width;
+                dst_rect.h = t_height;
+                SDL_RenderCopy(renderer, err_tex, NULL, &dst_rect);
+
                 SDL_SetRenderDrawColor(renderer, 0xDD, 0x33, 0x33, 0xBB);
             } else {
                 SDL_SetRenderDrawColor(renderer, 0x55, 0xAA, 0x55, 0xBB);
@@ -179,7 +198,7 @@ int main(int argc, char **argv) {
             for (int s = 0; s < LOADING_DONE; s++) {
                 SDL_Rect loading_rect = {0};
                 loading_rect.x = (width - 40 * LOADING_DONE) / 2
-                    + s * 40;
+                    + s * 40 + 4;
                 loading_rect.y = height / 2;
                 loading_rect.w = 32;
                 loading_rect.h = 32;
