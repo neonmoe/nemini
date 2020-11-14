@@ -10,11 +10,61 @@
 #include "gemini.h"
 #include "text.h"
 #include "browser.h"
+#include "loading.bmp.h"
 
 int get_refresh_rate(SDL_Window *);
 bool get_scale(SDL_Window *, SDL_Renderer *, float *, float *);
 
 int main(int argc, char **argv) {
+    SDL_RWops *loading_img = SDL_RWFromMem((void *)loading_image_bmp,
+                                           sizeof(loading_image_bmp));
+    SDL_Surface *loading_surf = SDL_LoadBMP_RW(loading_img, 0);
+
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Couldn't initialize SDL: %s",
+                     SDL_GetError());
+        return 1;
+    }
+
+    Uint32 flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+    SDL_Window *window = SDL_CreateWindow("Nemini",
+                                          SDL_WINDOWPOS_UNDEFINED,
+                                          SDL_WINDOWPOS_UNDEFINED,
+                                          640, 480, flags);
+    if (window == NULL) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Couldn't create window: %s",
+                     SDL_GetError());
+        return 1;
+    }
+
+    SDL_Surface *window_surf = SDL_GetWindowSurface(window);
+    if (window_surf != NULL) {
+        SDL_Rect rect = {0};
+        rect.x = (window_surf->w - loading_surf->w) / 2;
+        rect.y = (window_surf->h - loading_surf->h) / 2;
+        rect.w = loading_surf->w;
+        rect.h = loading_surf->h;
+        SDL_BlitSurface(loading_surf, NULL, window_surf, &rect);
+        SDL_UpdateWindowSurface(window);
+    }
+    SDL_FreeSurface(loading_surf);
+    SDL_RWclose(loading_img);
+
+    SDL_Renderer *renderer = SDL_GetRenderer(window);
+    if (renderer == NULL) {
+        renderer = SDL_CreateRenderer(window, -1, 0);
+        if (renderer == NULL) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                         "Couldn't create renderer: %s",
+                         SDL_GetError());
+            return 1;
+        }
+    }
+
+    browser_init();
+
     int sockets_status = sockets_init();
     if (sockets_status != ERR_NONE) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -31,23 +81,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Couldn't initialize SDL: %s",
-                     SDL_GetError());
-        return 1;
-    }
-
-    SDL_Window *window;
-    SDL_Renderer *renderer;
-    Uint32 flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
-    if (SDL_CreateWindowAndRenderer(640, 480, flags, &window, &renderer)) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                     "Couldn't create window and renderer: %s",
-                     SDL_GetError());
-        return 1;
-    }
-
     int text_renderer_status = text_renderer_init();
     if (text_renderer_status != ERR_NONE) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -60,7 +93,14 @@ int main(int argc, char **argv) {
 
     browser_set_status(LOADING_CONNECTING);
     if (argc >= 2) {
-        browser_start_loading(argv[1]);
+        float scale_x, scale_y;
+        if (get_scale(window, renderer, &scale_x, &scale_y)) {
+            SDL_RenderSetScale(renderer, scale_x, scale_y);
+        }
+        int width, height;
+        SDL_GetRendererOutputSize(renderer, &width, &height);
+
+        browser_start_loading(argv[1], width, scale_x);
     } else {
         SDL_Log("Usage: %s <url>", argv[0]);
         return 0;
@@ -92,21 +132,33 @@ int main(int argc, char **argv) {
         SDL_SetRenderDrawColor(renderer, 0xDD, 0xDD, 0xDD, 0xDD);
         SDL_RenderClear(renderer);
 
-        enum loading_status page_status = browser_get_status();
-        if (page_status == LOADING_DONE) {
-            struct loaded_page *page = get_browser_page();
-
-            if (page->texture == NULL) {
-                page->texture = SDL_CreateTextureFromSurface(renderer, page->surface);
+        struct loaded_page *page = browser_get_page();
+        if (page->texture != NULL || page->status == LOADING_DONE) {
+            if (page->surface != NULL) {
+                if (page->texture != NULL) {
+                    SDL_DestroyTexture(page->texture);
+                }
+                page->texture = SDL_CreateTextureFromSurface(renderer,
+                                                             page->surface);
                 if (page->texture != NULL) {
                     SDL_FreeSurface(page->surface);
                     page->surface = NULL;
                 }
-            } else {
+            }
+
+            if (page->texture != NULL) {
                 Uint32 t_format;
                 int t_access, t_width, t_height;
                 SDL_QueryTexture(page->texture, &t_format, &t_access,
                                  &t_width, &t_height);
+
+                int desired_width = (int)(width * scale_x)
+                    - ((int)(width * scale_x) % 100);
+                desired_width = SDL_min(500, SDL_max(100, desired_width));
+                if (t_width != desired_width) {
+                    browser_redraw_page(page, desired_width, scale_x);
+                }
+
                 t_width /= scale_x;
                 t_height /= scale_y;
                 SDL_Rect dst_rect = {0};
@@ -117,16 +169,21 @@ int main(int argc, char **argv) {
                 SDL_RenderCopy(renderer, page->texture, NULL, &dst_rect);
             }
         } else {
-            SDL_SetRenderDrawColor(renderer, 0x55, 0xAA, 0x55, 0xBB);
+            bool is_err = page->error != ERR_NONE;
+            if (is_err) {
+                SDL_SetRenderDrawColor(renderer, 0xDD, 0x33, 0x33, 0xBB);
+            } else {
+                SDL_SetRenderDrawColor(renderer, 0x55, 0xAA, 0x55, 0xBB);
+            }
 
             for (int s = 0; s < LOADING_DONE; s++) {
                 SDL_Rect loading_rect = {0};
                 loading_rect.x = (width - 40 * LOADING_DONE) / 2
                     + s * 40;
-                loading_rect.y = (height - 32) / 2;
+                loading_rect.y = height / 2;
                 loading_rect.w = 32;
                 loading_rect.h = 32;
-                if (s < (int)page_status) {
+                if (s < (int)(page->status) || is_err) {
                     SDL_RenderFillRect(renderer, &loading_rect);
                 } else {
                     SDL_RenderDrawRect(renderer, &loading_rect);

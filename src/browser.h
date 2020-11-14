@@ -6,16 +6,7 @@
 
 #include <SDL.h>
 #include "error.h"
-
-struct loaded_page {
-    struct loaded_page *parent;
-
-    // When loading, surface is set. After the first render, the
-    // surface is loaded into texture memory, and freed.
-    // So surface == null XOR texture == null.
-    SDL_Surface *surface;
-    SDL_Texture *texture;
-};
+#include "gemini.h"
 
 enum loading_status {
     LOADING_CONNECTING,
@@ -28,10 +19,30 @@ enum loading_status {
     LOADING_DONE,
 };
 
+struct loaded_page {
+    struct loaded_page *parent;
+    struct loaded_page **children;
+    enum nemini_error error;
+    enum loading_status status;
+    const char *url;
+    struct gemini_response response;
+    int rendered_width;
+    float rendered_scale;
+
+    // The surface pointer works as a kind of "queue" for the texture
+    // pointer: when this page is rendered, the surface is checked: if
+    // non-null, it is uploaded to the texture and freed.
+    SDL_Surface *surface;
+    SDL_Texture *texture;
+};
+
 void browser_set_status(enum loading_status new_status);
-enum loading_status browser_get_status(void);
-enum nemini_error browser_start_loading(const char *url);
-struct loaded_page *get_browser_page(void);
+enum nemini_error browser_start_loading(const char *url, int page_width,
+                                        float page_scale);
+void browser_redraw_page(struct loaded_page *page, int page_width,
+                         float page_scale);
+struct loaded_page *browser_get_page(void);
+void browser_init(void);
 void browser_free(void);
 
 #endif

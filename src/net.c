@@ -112,6 +112,7 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
         err = ERR_PUT_REQUEST;
         goto free_up_to_bio;
     }
+    SDL_free(request);
 
     browser_set_status(LOADING_RECEIVING_HEADER);
 
