@@ -119,12 +119,15 @@ int main(int argc, char **argv) {
         return 0;
     }
 
-    // For lerps:
+    // UI state:
     float loading_bar_width = 0;
+    float scroll = 0;
+    int content_height = 0;
 
     bool mouse_held = false;
     bool mouse_clicked = false;
     SDL_Point mouse = {0};
+
     bool running = true;
     int refresh_rate = 60;
     while (running) {
@@ -145,6 +148,11 @@ int main(int argc, char **argv) {
                 mouse_held = true;
             } else if (event.type == SDL_MOUSEBUTTONUP) {
                 mouse_held = false;
+            } else if (event.type == SDL_MOUSEWHEEL) {
+                float scale = 0;
+                get_scale(window, renderer, &scale, NULL);
+                float line_height = text_line_height(scale);
+                scroll += event.wheel.y * line_height * 3;
             }
         }
         if (!running) {
@@ -171,6 +179,8 @@ int main(int argc, char **argv) {
             current_cursor = cursor_wait;
         }
 
+        scroll = SDL_min(64, SDL_max(height - content_height - 64, scroll));
+
         if (page->texture != NULL || page->surface != NULL) {
             if (page->surface != NULL) {
                 if (page->texture != NULL) {
@@ -182,9 +192,12 @@ int main(int argc, char **argv) {
                     SDL_FreeSurface(page->surface);
                     page->surface = NULL;
                 }
+                scroll = page->rendered_scroll;
             }
 
             if (page->texture != NULL) {
+                page->rendered_scroll = scroll;
+
                 Uint32 t_format;
                 int t_access, t_width, t_height;
                 SDL_QueryTexture(page->texture, &t_format, &t_access,
@@ -199,9 +212,9 @@ int main(int argc, char **argv) {
                 t_height /= scale_y;
                 SDL_Rect dst_rect = {0};
                 dst_rect.x = (width - t_width) / 2;
-                dst_rect.y = 64;
+                dst_rect.y = page->rendered_scroll;
                 dst_rect.w = t_width;
-                dst_rect.h = t_height;
+                dst_rect.h = content_height = t_height;
                 SDL_RenderCopy(renderer, page->texture, NULL, &dst_rect);
 
                 SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_MOD);
@@ -254,9 +267,9 @@ int main(int argc, char **argv) {
                 t_height /= scale_y;
                 SDL_Rect dst_rect = {0};
                 dst_rect.x = (width - t_width) / 2;
-                dst_rect.y = 14;
+                dst_rect.y = scroll;
                 dst_rect.w = t_width;
-                dst_rect.h = t_height;
+                dst_rect.h = content_height = t_height;
                 SDL_SetRenderDrawColor(renderer, bg_r, bg_g, bg_b, 0xFF);
                 SDL_RenderFillRect(renderer, &dst_rect);
                 SDL_RenderCopy(renderer, err_tex, NULL, &dst_rect);
@@ -347,8 +360,12 @@ bool get_scale(SDL_Window *window, SDL_Renderer *renderer,
                                   &physical_height)) {
         return false;
     }
-    *scale_x = (float) physical_width / (float) logical_width;
-    *scale_y = (float) physical_height / (float) logical_height;
+    if (scale_x != NULL) {
+        *scale_x = (float) physical_width / (float) logical_width;
+    }
+    if (scale_y != NULL) {
+        *scale_y = (float) physical_height / (float) logical_height;
+    }
     return true;
 }
 

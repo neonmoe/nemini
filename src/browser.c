@@ -125,11 +125,16 @@ enum nemini_error browser_start_loading(const char *url,
     page.response = response;
     page.rendered_width = page_width;
     page.rendered_scale = page_scale;
+    page.rendered_scroll = 0;
     page.surface = NULL;
     page.texture = NULL;
     sb_push(loaded_pages, page);
     void *page_ptr = (void *)(&sb_last(loaded_pages));
     SDL_TLSSet(tls_current_page, page_ptr, 0);
+
+    if (from != NULL) {
+        sb_push(from->children, page_ptr);
+    }
 
     SDL_Thread *thread = SDL_CreateThread(load_page, "GeminiLoader", page_ptr);
     if (thread != NULL) {
@@ -163,6 +168,7 @@ void browser_init(void) {
 void browser_free(void) {
     int page_count = sb_count(loaded_pages);
     for (int i = 0; i < page_count; i++) {
+        sb_free(loaded_pages[i].children);
         SDL_FreeSurface(loaded_pages[i].surface);
         SDL_DestroyTexture(loaded_pages[i].texture);
         gemini_response_free(loaded_pages[i].response);

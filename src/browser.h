@@ -29,6 +29,7 @@ struct loaded_page {
     struct gemini_response response;
     int rendered_width;
     float rendered_scale;
+    float rendered_scroll;
     struct text_interactable interactable;
 
     // The surface pointer works as a kind of "queue" for the texture

@@ -38,6 +38,7 @@ struct text_interactable {
 
 enum nemini_error text_renderer_init(void);
 void text_renderer_free(void);
+int text_line_height(float scale);
 enum nemini_error text_render(SDL_Surface **result,
                               struct text_interactable *interactable,
                               const char *text, int width, float scale);

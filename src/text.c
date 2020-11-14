@@ -315,6 +315,15 @@ static SDL_Surface *render_glyphs(struct glyph_blueprint *glyphs,
     return surface;
 }
 
+int text_line_height(float scale) {
+    float font_size = size_by_line_type(GEMINI_TEXT);
+    float sf = stbtt_ScaleForMappingEmToPixels(&default_font,
+                                               font_size * scale);
+    int ascent, descent, line_gap;
+    stbtt_GetFontVMetrics(&default_font, &ascent, &descent, &line_gap);
+    return sf * (ascent - descent + line_gap);
+}
+
 enum nemini_error text_render(SDL_Surface **result,
                               struct text_interactable *result_interactable,
                               const char *text, int width, float scale) {
@@ -374,7 +383,7 @@ enum nemini_error text_render(SDL_Surface **result,
 
         unsigned int good_breaking_index = 0;
         unsigned int bad_breaking_index = 1;
-        unsigned int bad_break_margin = (int)(width - 64);
+        unsigned int bad_break_margin = (int)(width * 0.8);
 
         float line_start_y = y_cursor;
         float line_end_x = 0;
@@ -433,10 +442,11 @@ enum nemini_error text_render(SDL_Surface **result,
 
             float adv = sf * (advance_raw + kerning_adv_raw);
             if (SDL_ceil(x_cursor + adv + breaking_margin) < width) {
-                bad_breaking_index = i + char_width;
                 if (x_cursor + adv > bad_break_margin
                     && codepoint_is_breaking(codepoint)) {
                     good_breaking_index = i;
+                } else {
+                    bad_breaking_index = i + char_width;
                 }
             }
 
