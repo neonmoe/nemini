@@ -4,6 +4,8 @@
 #ifndef NEMINI_URL_H
 #define NEMINI_URL_H
 
+char *preprocess_url(const char *base_url, const char *url);
+
 // Parses the url from input_url into:
 // - host (the bit after :// and before the port or resource)
 // - port (optionally included after the domain, separated by a :)

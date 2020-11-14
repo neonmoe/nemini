@@ -55,11 +55,91 @@ enum url_reading_stage {
     RESOURCE,
 };
 
+// Returns an absolute url: if "url" is absolute, a copy of it is
+// returned, otherwise it will be merged on top of "base_url" and that
+// will be returned. If "base_url" is null, "url" is considered
+// absolute as well.
+char *preprocess_url(const char *base_url, const char *url) {
+    bool absolute = false;
+    int url_len = SDL_strlen(url);
+    if (base_url != NULL) {
+        for (int i = 0; i < url_len; i++) {
+            if (url[i] == ':') {
+                // This could be related to the port or the scheme, but
+                // either way, this is definitely an absolute url.
+                absolute = true;
+                break;
+            }
+        }
+    } else {
+        absolute = true;
+    }
+
+    // Ensure that base_url is properly formatted to avoid weird bugs.
+    if (!absolute) {
+        char *scheme = "gemini://";
+        for (int i = 0; scheme[i] != '\0'; i++) {
+            if (base_url[i] != scheme[i]) {
+                SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                             "Base url doesn't have a scheme: %s",
+                             base_url);
+                return NULL;
+            }
+        }
+        bool has_slash = false;
+        for (int i = 9; base_url[i] != '\0'; i++) {
+            if (base_url[i] == '/') {
+                has_slash = true;
+            }
+        }
+        if (!has_slash) {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                         "Base url doesn't have a resource: %s",
+                         base_url);
+            return NULL;
+        }
+    }
+
+    char *result;
+    if (absolute) {
+        result = SDL_malloc(url_len + 1);
+        SDL_memcpy(result, url, url_len);
+        result[url_len] = '\0';
+    } else if (url[0] == '/') {
+        int base_url_len = 0;
+        for (int i = 0; base_url[i] != '\0'; i++) {
+            if (base_url[i] == ':' && base_url[i + 1] == '/') {
+                i += 2;
+            } else if (base_url[i] == '/') {
+                base_url_len = i;
+                break;
+            }
+        }
+        result = SDL_malloc(base_url_len + url_len + 1);
+        SDL_memcpy(result, base_url, base_url_len);
+        SDL_memcpy(&result[base_url_len], url, url_len);
+        result[base_url_len + url_len] = '\0';
+    } else {
+        int base_url_len = SDL_strlen(base_url);
+        for (int i = base_url_len - 1; i >= 0; i--) {
+            if (base_url[i] == '/') {
+                base_url_len = i + 1;
+                break;
+            }
+        }
+        result = SDL_malloc(base_url_len + url_len + 1);
+        SDL_memcpy(result, base_url, base_url_len);
+        SDL_memcpy(&result[base_url_len], url, url_len);
+        result[base_url_len + url_len] = '\0';
+    }
+
+    return result;
+}
+
 // Parses the relevant url parts from input_url and allocates them
 // inside host, port, and resource.
 enum nemini_error parse_gemini_url(char *input_url, char **host, char **port,
                                    char **resource) {
-
     if (input_url == NULL) { return ERR_UNEXPECTED; }
 
     // These pointers point at the start of the section in input_url
@@ -115,6 +195,7 @@ enum nemini_error parse_gemini_url(char *input_url, char **host, char **port,
             if (host_len > 0 && c == '/') {
                 stage = RESOURCE;
                 resource_inline = cursor;
+                resource_len++;
             } else if (host_len > 1 && c == ':') {
                 stage = PORT;
                 port_inline = cursor + 1;
@@ -127,6 +208,7 @@ enum nemini_error parse_gemini_url(char *input_url, char **host, char **port,
             if (port_len > 0 && c == '/') {
                 stage = RESOURCE;
                 resource_inline = cursor;
+                resource_len++;
             } else if (valid_port_char(c)) {
                 port_len++;
             } else {
@@ -167,13 +249,13 @@ enum nemini_error parse_gemini_url(char *input_url, char **host, char **port,
     }
 
     if (resource_inline == NULL) {
-        *resource = SDL_malloc(1);
+        *resource = SDL_malloc(2);
         if (*resource == NULL) {
             SDL_free(*host);
             SDL_free(*port);
             return ERR_OUT_OF_MEMORY;
         }
-        SDL_memcpy(*resource, "\0", 1);
+        SDL_memcpy(*resource, "/\0", 2);
     } else {
         *resource = SDL_malloc(resource_len + 1);
         if (*resource == NULL) {

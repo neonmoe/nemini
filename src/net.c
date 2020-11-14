@@ -47,14 +47,19 @@ void net_free(void) {
     SSL_CTX_free(ctx);
 }
 
-enum nemini_error net_request(const char *url, struct gemini_response *result) {
+enum nemini_error net_request(const char *url, const char *parent_url,
+                              struct gemini_response *result) {
     enum nemini_error err = ERR_NONE;
 
     browser_set_status(LOADING_CONNECTING);
 
+    char *new_url = preprocess_url(parent_url, url);
     char *host, *port, *resource;
-    int parse_status = parse_gemini_url(url, &host, &port, &resource);
-    if (parse_status != ERR_NONE) { return parse_status; }
+    int parse_status = parse_gemini_url(new_url, &host, &port, &resource);
+    SDL_free(new_url);
+    if (parse_status != ERR_NONE) {
+        return parse_status;
+    }
 
     int socket_fd;
     int socket_status = socket_connect(host, port, &socket_fd);
@@ -189,6 +194,17 @@ enum nemini_error net_request(const char *url, struct gemini_response *result) {
     } else {
         res.body = NULL;
     }
+
+    int url_len = SDL_strlen(request) - 2;
+    res.url = SDL_malloc(url_len + 1);
+    if (res.url == NULL) {
+        SDL_free(res.body);
+        SDL_free(meta);
+        err = ERR_OUT_OF_MEMORY;
+        goto free_up_to_bio;
+    }
+    SDL_memcpy(res.url, request, url_len);
+    res.url[url_len] = '\0';
 
     // res.body and res.meta.meta are allocated in this function, but outlive it.
     // They are free with gemini_response_free();

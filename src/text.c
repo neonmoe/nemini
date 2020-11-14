@@ -109,6 +109,8 @@ static enum nemini_error text_paragraphize(struct nemini_string string,
                 if (title_index != -1) {
                     paragraph.string = get_after_whitespace(paragraph.link,
                                                             title_index);
+                    paragraph.link = nemini_substring(paragraph.link, 0,
+                                                      title_index);
                 } else {
                     paragraph.string = paragraph.link;
                 }
@@ -220,8 +222,8 @@ struct glyph_blueprint {
     float y_cursor;
 };
 
-SDL_Surface *render_glyphs(struct glyph_blueprint *glyphs,
-                           int width, int height) {
+static SDL_Surface *render_glyphs(struct glyph_blueprint *glyphs,
+                                  int scale, int width, int height) {
     SDL_Surface *surface = NULL;
     surface = SDL_CreateRGBSurfaceWithFormat(0, width, height, 32,
                                              SDL_PIXELFORMAT_RGBA32);
@@ -284,18 +286,22 @@ SDL_Surface *render_glyphs(struct glyph_blueprint *glyphs,
                 underline_start_x = glyph.x_cursor;
             } else if (i == glyphs_count - 1
                        || glyphs[i + 1].y_cursor != glyph.y_cursor) {
-                int underline_y = glyph.y_cursor + 2;
                 int start_x = SDL_max(0, underline_start_x);
-                int end_x = SDL_min(width, glyph.x_cursor + x_offset + bm_width);
-                for (int x = start_x; x < end_x; x++) {
-                    unsigned int idx = x + underline_y * pitch;
-                    unsigned char prev_a = x == 0 ? 0 :
-                        ((surf_pixels[idx - 1] >> a_shift) & 0xFF);
-                    unsigned char next_a = x == width - 1 ? 0 :
-                        ((surf_pixels[idx + 1] >> a_shift) & 0xFF);
-                    unsigned char link_a = 0x88;
-                    if ((prev_a == 0 || prev_a == link_a) && next_a == 0) {
-                        surf_pixels[idx] = base_color | (link_a << a_shift);
+                int end_x =
+                    SDL_min(width, glyph.x_cursor + x_offset + bm_width);
+                for (int offs_y = 0; offs_y < scale; offs_y++) {
+                    int underline_y = glyph.y_cursor + 2 * scale + offs_y;
+                    for (int x = start_x; x < end_x; x++) {
+                        unsigned int idx = x + underline_y * pitch;
+                        unsigned char prev_a = x == 0 ? 0 :
+                            ((surf_pixels[idx - 1] >> a_shift) & 0xFF);
+                        unsigned char next_a = x == width - 1 ? 0 :
+                            ((surf_pixels[idx + 1] >> a_shift) & 0xFF);
+                        unsigned char link_a = 0x88;
+                        if ((prev_a == 0 || prev_a == link_a) && next_a == 0) {
+                            surf_pixels[idx] = base_color
+                                | (link_a << a_shift);
+                        }
                     }
                 }
                 underline_start_x = -1;
@@ -505,7 +511,7 @@ enum nemini_error text_render(SDL_Surface **result,
     browser_set_status(LOADING_RASTERIZING);
 
     int height = (int)y_cursor;
-    SDL_Surface *surface = render_glyphs(glyphs, width, height);
+    SDL_Surface *surface = render_glyphs(glyphs, (int)scale, width, height);
     sb_free(glyphs);
 
     *result_interactable = interactable;
@@ -586,7 +592,7 @@ SDL_Texture *text_cached_render(SDL_Renderer *renderer,
 
     int width = (int)x_cursor;
     int height = (int)y_cursor;
-    SDL_Surface *surface = render_glyphs(glyphs, width, height);
+    SDL_Surface *surface = render_glyphs(glyphs, (int)scale, width, height);
     sb_free(glyphs);
     SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
     SDL_FreeSurface(surface);

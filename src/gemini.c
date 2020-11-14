@@ -28,4 +28,5 @@ void gemini_response_free(struct gemini_response res) {
     if (res.body != NULL) {
         SDL_free(res.body);
     }
+    SDL_free(res.url);
 }

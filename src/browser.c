@@ -9,6 +9,7 @@
 #include "net.h"
 #include "text.h"
 #include "gemini.h"
+#include "url.h"
 
 static struct loaded_page *loaded_pages = NULL;
 static SDL_TLSID tls_current_page;
@@ -74,14 +75,27 @@ static int load_page(void *data) {
     SDL_TLSSet(tls_current_page, data, 0);
     struct loaded_page *page = (struct loaded_page *)data;
 
-    page->error = net_request(page->url, &page->response);
+    const char *parent_url = NULL;
+    if (page->parent != NULL) {
+        parent_url = page->parent->response.url;
+    }
+    page->error = net_request(page->load_url, parent_url, &page->response);
+    while (page->response.status / 10 == 3 && page->error == ERR_NONE) {
+        // TODO?: could render a log here "⮑/⮡/↳ redirected to ..."
+        struct gemini_response prev_response = page->response;
+        page->error = net_request(prev_response.meta.redirect_url,
+                                  prev_response.url,
+                                  &page->response);
+        gemini_response_free(prev_response);
+    }
 
     if (page->error == ERR_NONE) {
         const char *content;
         if (page->response.status / 10 == 2) {
             content = page->response.body;
         } else {
-            content = get_status_page(page->response.status, page->response.meta.meta);
+            content = get_status_page(page->response.status,
+                                      page->response.meta.meta);
         }
         struct text_interactable interactable;
         SDL_Surface *surface = NULL;
@@ -98,15 +112,16 @@ static int load_page(void *data) {
     return 0;
 }
 
-enum nemini_error browser_start_loading(const char *url, int page_width,
-                                        float page_scale) {
+enum nemini_error browser_start_loading(const char *url,
+                                        struct loaded_page *from,
+                                        int page_width, float page_scale) {
     struct loaded_page page = {0};
     struct gemini_response response = {0};
-    page.parent = NULL;
+    page.parent = from;
     page.children = NULL;
     page.error = ERR_NONE;
     page.status = LOADING_CONNECTING;
-    page.url = url;
+    page.load_url = url;
     page.response = response;
     page.rendered_width = page_width;
     page.rendered_scale = page_scale;

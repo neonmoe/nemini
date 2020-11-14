@@ -7,6 +7,9 @@
 #include "ctx.h"
 
 struct gemini_response {
+    // The url where this response is from;
+    char *url;
+
     // Gemini status code.
     int status;
 

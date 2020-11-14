@@ -20,6 +20,9 @@ enum nemini_error nemini_string_from(const char *cstring,
 struct nemini_string nemini_substring(struct nemini_string original,
                                       unsigned int index,
                                       unsigned int length) {
+    if (original.length == 0) {
+        return original;
+    }
     if (index >= original.length) {
         index = original.length - 1;
     }

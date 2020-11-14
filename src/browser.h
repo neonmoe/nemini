@@ -25,7 +25,7 @@ struct loaded_page {
     struct loaded_page **children;
     enum nemini_error error;
     enum loading_status status;
-    const char *url;
+    const char *load_url;
     struct gemini_response response;
     int rendered_width;
     float rendered_scale;
@@ -39,8 +39,9 @@ struct loaded_page {
 };
 
 void browser_set_status(enum loading_status new_status);
-enum nemini_error browser_start_loading(const char *url, int page_width,
-                                        float page_scale);
+enum nemini_error browser_start_loading(const char *url,
+                                        struct loaded_page *from,
+                                        int page_width, float page_scale);
 void browser_redraw_page(struct loaded_page *page, int page_width,
                          float page_scale);
 struct loaded_page *browser_get_page(void);

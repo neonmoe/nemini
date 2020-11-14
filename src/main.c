@@ -3,6 +3,11 @@
 
 #include <SDL.h>
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#include "stretchy_buffer.h"
+#pragma GCC diagnostic pop
+
 #include "ctx.h"
 #include "socket.h"
 #include "net.h"
@@ -65,6 +70,7 @@ int main(int argc, char **argv) {
             return 1;
         }
     }
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
     browser_init();
 
@@ -92,7 +98,10 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    SDL_SetWindowTitle(window, "Nemini");
+    SDL_Cursor *cursor_arrow, *cursor_hand, *cursor_wait;
+    cursor_arrow = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
+    cursor_hand = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
+    cursor_wait = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_WAITARROW);
 
     browser_set_status(LOADING_CONNECTING);
     if (argc >= 2) {
@@ -104,7 +113,7 @@ int main(int argc, char **argv) {
         SDL_GetRendererOutputSize(renderer, &width, &height);
 
         int content_width = get_desired_content_width(width, scale_x);
-        browser_start_loading(argv[1], content_width, scale_x);
+        browser_start_loading(argv[1], NULL, content_width, scale_x);
     } else {
         SDL_Log("Usage: %s <url>", argv[0]);
         return 0;
@@ -113,15 +122,29 @@ int main(int argc, char **argv) {
     // For lerps:
     float loading_bar_width = 0;
 
+    bool mouse_held = false;
+    bool mouse_clicked = false;
+    SDL_Point mouse = {0};
     bool running = true;
     int refresh_rate = 60;
     while (running) {
         Uint32 frame_start_ms = SDL_GetTicks();
+        mouse_clicked = false;
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
                 running = false;
                 break;
+            } else if (event.type == SDL_MOUSEMOTION) {
+                mouse.x = event.motion.x;
+                mouse.y = event.motion.y;
+            } else if (event.type == SDL_MOUSEBUTTONDOWN) {
+                if (!mouse_held) {
+                    mouse_clicked = true;
+                }
+                mouse_held = true;
+            } else if (event.type == SDL_MOUSEBUTTONUP) {
+                mouse_held = false;
             }
         }
         if (!running) {
@@ -143,6 +166,11 @@ int main(int argc, char **argv) {
         SDL_RenderClear(renderer);
 
         struct loaded_page *page = browser_get_page();
+        SDL_Cursor *current_cursor = cursor_arrow;
+        if (page->status != LOADING_DONE) {
+            current_cursor = cursor_wait;
+        }
+
         if (page->texture != NULL || page->surface != NULL) {
             if (page->surface != NULL) {
                 if (page->texture != NULL) {
@@ -175,6 +203,36 @@ int main(int argc, char **argv) {
                 dst_rect.w = t_width;
                 dst_rect.h = t_height;
                 SDL_RenderCopy(renderer, page->texture, NULL, &dst_rect);
+
+                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_MOD);
+                int links_count = sb_count(page->interactable.links);
+                for (int i = 0; i < links_count; i++) {
+                    struct link_box link = page->interactable.links[i];
+                    SDL_Rect link_rect = {0};
+                    link_rect.x = link.rect.x + dst_rect.x;
+                    link_rect.y = link.rect.y + dst_rect.y;
+                    link_rect.w = link.rect.w;
+                    link_rect.h = link.rect.h;
+                    if (SDL_PointInRect(&mouse, &link_rect)) {
+                        current_cursor = cursor_hand;
+
+                        if (mouse_held) {
+                            SDL_SetRenderDrawColor(renderer,
+                                                   0xFF, 0xEE, 0xDD, 0xFF);
+                            SDL_RenderFillRect(renderer, &link_rect);
+                        } else {
+                            SDL_SetRenderDrawColor(renderer,
+                                                   0xEE, 0xEE, 0xFF, 0xFF);
+                            SDL_RenderFillRect(renderer, &link_rect);
+                        }
+
+                        if (mouse_clicked) {
+                            browser_start_loading(link.link, page,
+                                                  desired_width, scale_x);
+                        }
+                    }
+                }
+                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
             }
         }
 
@@ -221,6 +279,7 @@ int main(int argc, char **argv) {
             SDL_RenderFillRect(renderer, &loading_rect);
         }
 
+        SDL_SetCursor(current_cursor);
         SDL_RenderPresent(renderer);
 
         // Temporary fps displayer until the text rendering system is
@@ -293,8 +352,8 @@ bool get_scale(SDL_Window *window, SDL_Renderer *renderer,
 
 int get_desired_content_width(int width, float scale) {
     int desired_width = (int)(width * scale)
-        - ((int)(width * scale) % 50) - 20;
-    return SDL_min(500, SDL_max(100, desired_width));
+        - ((int)(width * scale) % (int)(50 * scale)) - (int)(20 * scale);
+    return SDL_min(500 * scale, SDL_max(100 * scale, desired_width));
 }
 
 float lerp(float from, float to, float a) {

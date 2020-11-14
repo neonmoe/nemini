@@ -9,6 +9,7 @@
 
 enum nemini_error net_init(void);
 void net_free(void);
-enum nemini_error net_request(const char *url, struct gemini_response *result);
+enum nemini_error net_request(const char *url, const char *parent_url,
+                              struct gemini_response *result);
 
 #endif
