@@ -102,7 +102,12 @@ static enum nemini_error text_paragraphize(struct nemini_string string,
             paragraph.link.length = 0;
 
             start = i + 1;
-            if (nemini_string_start_matches(paragraph.string, "=>")) {
+            if (nemini_string_start_matches(paragraph.string, "```")) {
+                preformatted = !preformatted;
+                continue;
+            } else if (preformatted) {
+                paragraph.type = GEMINI_PREFORMATTED;
+            } else if (nemini_string_start_matches(paragraph.string, "=>")) {
                 paragraph.type = GEMINI_LINK;
                 paragraph.link = get_after_whitespace(paragraph.string, 2);
                 int title_index = find_whitespace_index(paragraph.link);
@@ -114,9 +119,6 @@ static enum nemini_error text_paragraphize(struct nemini_string string,
                 } else {
                     paragraph.string = paragraph.link;
                 }
-            } else if (nemini_string_start_matches(paragraph.string, "```")) {
-                preformatted = !preformatted;
-                continue;
             } else if (nemini_string_start_matches(paragraph.string, "#")) {
                 int offset;
                 if (paragraph.string.ptr[1] != '#') {
@@ -135,8 +137,6 @@ static enum nemini_error text_paragraphize(struct nemini_string string,
                 paragraph.type = GEMINI_UNORDERED_LIST;
             } else if (nemini_string_start_matches(paragraph.string, ">")) {
                 paragraph.type = GEMINI_QUOTE;
-            } else if (preformatted) {
-                paragraph.type = GEMINI_PREFORMATTED;
             } else {
                 paragraph.type = GEMINI_TEXT;
             }

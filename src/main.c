@@ -239,6 +239,8 @@ int main(int argc, char **argv) {
         if (page->status != LOADING_DONE) {
             bool is_err = page->error != ERR_NONE;
             if (is_err) {
+                current_cursor = cursor_arrow;
+
                 char str[1024];
                 SDL_snprintf(str, 1024, "Error: %s",
                              get_nemini_err_str(page->error));
@@ -252,7 +254,7 @@ int main(int argc, char **argv) {
                 t_height /= scale_y;
                 SDL_Rect dst_rect = {0};
                 dst_rect.x = (width - t_width) / 2;
-                dst_rect.y = 8;
+                dst_rect.y = 14;
                 dst_rect.w = t_width;
                 dst_rect.h = t_height;
                 SDL_SetRenderDrawColor(renderer, bg_r, bg_g, bg_b, 0xFF);
@@ -353,7 +355,7 @@ bool get_scale(SDL_Window *window, SDL_Renderer *renderer,
 int get_desired_content_width(int width, float scale) {
     int desired_width = (int)(width * scale)
         - ((int)(width * scale) % (int)(50 * scale)) - (int)(20 * scale);
-    return SDL_min(500 * scale, SDL_max(100 * scale, desired_width));
+    return SDL_min(800 * scale, SDL_max(100 * scale, desired_width));
 }
 
 float lerp(float from, float to, float a) {
