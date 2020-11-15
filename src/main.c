@@ -103,9 +103,11 @@ int main(int argc, char **argv) {
     cursor_hand = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
     cursor_wait = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_WAITARROW);
 
+    // UI constants:
+    float scroll_margin = 64;
+
     // UI state:
     float loading_bar_width = 0;
-    float scroll_margin = 64;
     float scroll = scroll_margin;
     int content_height = 0;
 
@@ -133,9 +135,12 @@ int main(int argc, char **argv) {
 
     bool running = true;
     int refresh_rate = 60;
+    // Delta-time: how long the previous frame lasted.
+    float dt = 1.0 / refresh_rate;
     while (running) {
         Uint32 frame_start_ms = SDL_GetTicks();
         mouse_clicked = false;
+        float scroll_delta = 0;
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
@@ -155,7 +160,7 @@ int main(int argc, char **argv) {
                 float scale = 0;
                 get_scale(window, renderer, &scale, NULL);
                 float line_height = text_line_height(scale);
-                scroll += event.wheel.y * line_height * 3;
+                scroll_delta += event.wheel.y * line_height * 3;
             }
         }
         if (!running) {
@@ -184,7 +189,10 @@ int main(int argc, char **argv) {
 
         int max_scroll = scroll_margin;
         int min_scroll = height - content_height - scroll_margin;
-        scroll = SDL_min(max_scroll, SDL_max(min_scroll, scroll));
+        page->rendered_scroll += scroll_delta;
+        page->rendered_scroll =
+            SDL_min(max_scroll, SDL_max(min_scroll, page->rendered_scroll));
+        scroll = lerp(scroll, page->rendered_scroll, 7.5 * dt);
 
         if (page->texture != NULL || page->surface != NULL) {
             if (page->surface != NULL) {
@@ -201,8 +209,6 @@ int main(int argc, char **argv) {
             }
 
             if (page->texture != NULL) {
-                page->rendered_scroll = scroll;
-
                 Uint32 t_format;
                 int t_access, t_width, t_height;
                 SDL_QueryTexture(page->texture, &t_format, &t_access,
@@ -217,7 +223,7 @@ int main(int argc, char **argv) {
                 t_height /= scale_y;
                 SDL_Rect dst_rect = {0};
                 dst_rect.x = (width - t_width) / 2;
-                dst_rect.y = page->rendered_scroll;
+                dst_rect.y = scroll;
                 dst_rect.w = t_width;
                 dst_rect.h = content_height = t_height;
                 SDL_RenderCopy(renderer, page->texture, NULL, &dst_rect);
@@ -293,7 +299,7 @@ int main(int argc, char **argv) {
             } else {
                 float target = width * (int)page->status / (LOADING_DONE - 1);
                 loading_bar_width = lerp(loading_bar_width, target,
-                                         7.5 / refresh_rate);
+                                         7.5 * dt);
                 loading_rect.w = loading_bar_width;
             }
             loading_rect.h = 8;
@@ -328,6 +334,7 @@ int main(int argc, char **argv) {
         if (frame_duration < target_duration) {
             SDL_Delay(target_duration - frame_duration);
         }
+        dt = (SDL_GetTicks() - frame_start_ms) / 1000.0;
     }
 
     browser_free();
