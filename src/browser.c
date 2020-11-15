@@ -114,6 +114,7 @@ static int load_page(void *data) {
 
 enum nemini_error browser_start_loading(const char *url,
                                         struct loaded_page *from,
+                                        float initial_scroll,
                                         int page_width, float page_scale) {
     struct loaded_page page = {0};
     struct gemini_response response = {0};
@@ -125,7 +126,7 @@ enum nemini_error browser_start_loading(const char *url,
     page.response = response;
     page.rendered_width = page_width;
     page.rendered_scale = page_scale;
-    page.rendered_scroll = 0;
+    page.rendered_scroll = initial_scroll;
     page.surface = NULL;
     page.texture = NULL;
     sb_push(loaded_pages, page);

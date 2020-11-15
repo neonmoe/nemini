@@ -42,6 +42,7 @@ struct loaded_page {
 void browser_set_status(enum loading_status new_status);
 enum nemini_error browser_start_loading(const char *url,
                                         struct loaded_page *from,
+                                        float initial_scroll,
                                         int page_width, float page_scale);
 void browser_redraw_page(struct loaded_page *page, int page_width,
                          float page_scale);

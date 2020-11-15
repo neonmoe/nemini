@@ -103,6 +103,12 @@ int main(int argc, char **argv) {
     cursor_hand = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
     cursor_wait = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_WAITARROW);
 
+    // UI state:
+    float loading_bar_width = 0;
+    float scroll_margin = 64;
+    float scroll = scroll_margin;
+    int content_height = 0;
+
     browser_set_status(LOADING_CONNECTING);
     if (argc >= 2) {
         float scale_x, scale_y;
@@ -113,16 +119,13 @@ int main(int argc, char **argv) {
         SDL_GetRendererOutputSize(renderer, &width, &height);
 
         int content_width = get_desired_content_width(width, scale_x);
-        browser_start_loading(argv[1], NULL, content_width, scale_x);
+        browser_start_loading(argv[1], NULL,
+                              scroll_margin,
+                              content_width, scale_x);
     } else {
         SDL_Log("Usage: %s <url>", argv[0]);
         return 0;
     }
-
-    // UI state:
-    float loading_bar_width = 0;
-    float scroll = 0;
-    int content_height = 0;
 
     bool mouse_held = false;
     bool mouse_clicked = false;
@@ -179,7 +182,9 @@ int main(int argc, char **argv) {
             current_cursor = cursor_wait;
         }
 
-        scroll = SDL_min(64, SDL_max(height - content_height - 64, scroll));
+        int max_scroll = scroll_margin;
+        int min_scroll = height - content_height - scroll_margin;
+        scroll = SDL_min(max_scroll, SDL_max(min_scroll, scroll));
 
         if (page->texture != NULL || page->surface != NULL) {
             if (page->surface != NULL) {
@@ -241,6 +246,7 @@ int main(int argc, char **argv) {
 
                         if (mouse_clicked) {
                             browser_start_loading(link.link, page,
+                                                  scroll_margin,
                                                   desired_width, scale_x);
                         }
                     }
