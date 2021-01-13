@@ -16,6 +16,7 @@
 #include "text.h"
 #include "browser.h"
 #include "loading.bmp.h"
+#include "tree_renderer.h"
 
 int get_refresh_rate(SDL_Window *);
 bool get_scale(SDL_Window *, SDL_Renderer *, float *, float *);
@@ -121,8 +122,7 @@ int main(int argc, char **argv) {
         SDL_GetRendererOutputSize(renderer, &width, &height);
 
         int content_width = get_desired_content_width(width, scale_x);
-        browser_start_loading(argv[1], NULL,
-                              scroll_margin,
+        browser_start_loading(argv[1], NULL, scroll_margin,
                               content_width, scale_x);
     } else {
         SDL_Log("Usage: %s <url>", argv[0]);
@@ -132,6 +132,7 @@ int main(int argc, char **argv) {
     bool mouse_held = false;
     bool mouse_clicked = false;
     SDL_Point mouse = {0};
+    bool show_nav_tree = false;
 
     bool running = true;
     int refresh_rate = 60;
@@ -161,6 +162,11 @@ int main(int argc, char **argv) {
                 get_scale(window, renderer, &scale, NULL);
                 float line_height = text_line_height(scale);
                 scroll_delta += event.wheel.y * line_height * 3;
+            } else if (event.type == SDL_KEYDOWN) {
+                if (event.key.repeat == 0 && event.key.state == SDL_PRESSED
+                    && event.key.keysym.sym == SDLK_LALT) {
+                    show_nav_tree = !show_nav_tree;
+                }
             }
         }
         if (!running) {
@@ -187,123 +193,140 @@ int main(int argc, char **argv) {
             current_cursor = cursor_wait;
         }
 
-        int max_scroll = scroll_margin;
-        int min_scroll = height - content_height - scroll_margin;
-        page->rendered_scroll += scroll_delta;
-        page->rendered_scroll =
-            SDL_min(max_scroll, SDL_max(min_scroll, page->rendered_scroll));
-        scroll = lerp(scroll, page->rendered_scroll, 7.5 * dt);
-
-        if (page->texture != NULL || page->surface != NULL) {
-            if (page->surface != NULL) {
-                if (page->texture != NULL) {
-                    SDL_DestroyTexture(page->texture);
-                }
-                page->texture = SDL_CreateTextureFromSurface(renderer,
-                                                             page->surface);
-                if (page->texture != NULL) {
-                    SDL_FreeSurface(page->surface);
-                    page->surface = NULL;
-                }
-                scroll = page->rendered_scroll;
+        if (show_nav_tree) {
+            struct loaded_page *root = browser_get_root(page);
+            struct page_preview *list = NULL;
+            generate_preview_list(&list, root, -1, 0, 0);
+            int list_length = sb_count(list);
+            SDL_SetRenderDrawColor(renderer, 0x88, 0x88, 0x88, 0xFF);
+            for (int i = 0; i < list_length; i++) {
+                struct page_preview preview = list[i];
+                SDL_Rect rect = preview.rect;
+                rect.x += 400;
+                rect.y += 100;
+                SDL_RenderFillRect(renderer, &rect);
             }
+            sb_free(list);
+        } else {
+            int max_scroll = scroll_margin;
+            int min_scroll = height - content_height - scroll_margin;
+            page->rendered_scroll += scroll_delta;
+            page->rendered_scroll =
+                SDL_min(max_scroll, SDL_max(min_scroll, page->rendered_scroll));
+            scroll = lerp(scroll, page->rendered_scroll, 7.5 * dt);
 
-            if (page->texture != NULL) {
-                Uint32 t_format;
-                int t_access, t_width, t_height;
-                SDL_QueryTexture(page->texture, &t_format, &t_access,
-                                 &t_width, &t_height);
-
-                int desired_width = get_desired_content_width(width, scale_x);
-                if (t_width != desired_width) {
-                    browser_redraw_page(page, desired_width, scale_x);
+            if (page->texture != NULL || page->surface != NULL) {
+                if (page->surface != NULL) {
+                    if (page->texture != NULL) {
+                        SDL_DestroyTexture(page->texture);
+                    }
+                    page->texture = SDL_CreateTextureFromSurface(renderer,
+                                                                 page->surface);
+                    if (page->texture != NULL) {
+                        SDL_FreeSurface(page->surface);
+                        page->surface = NULL;
+                    }
+                    scroll = page->rendered_scroll;
                 }
 
-                t_width /= scale_x;
-                t_height /= scale_y;
-                SDL_Rect dst_rect = {0};
-                dst_rect.x = (width - t_width) / 2;
-                dst_rect.y = scroll;
-                dst_rect.w = t_width;
-                dst_rect.h = content_height = t_height;
-                SDL_RenderCopy(renderer, page->texture, NULL, &dst_rect);
+                if (page->texture != NULL) {
+                    Uint32 t_format;
+                    int t_access, t_width, t_height;
+                    SDL_QueryTexture(page->texture, &t_format, &t_access,
+                                     &t_width, &t_height);
 
-                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_MOD);
-                int links_count = sb_count(page->interactable.links);
-                for (int i = 0; i < links_count; i++) {
-                    struct link_box link = page->interactable.links[i];
-                    SDL_Rect link_rect = {0};
-                    link_rect.x = link.rect.x + dst_rect.x;
-                    link_rect.y = link.rect.y + dst_rect.y;
-                    link_rect.w = link.rect.w;
-                    link_rect.h = link.rect.h;
-                    if (SDL_PointInRect(&mouse, &link_rect)) {
-                        current_cursor = cursor_hand;
+                    int desired_width = get_desired_content_width(width, scale_x);
+                    if (t_width != desired_width) {
+                        browser_redraw_page(page, desired_width, scale_x);
+                    }
 
-                        if (mouse_held) {
-                            SDL_SetRenderDrawColor(renderer,
-                                                   0xFF, 0xEE, 0xDD, 0xFF);
-                            SDL_RenderFillRect(renderer, &link_rect);
-                        } else {
-                            SDL_SetRenderDrawColor(renderer,
-                                                   0xEE, 0xEE, 0xFF, 0xFF);
-                            SDL_RenderFillRect(renderer, &link_rect);
-                        }
+                    t_width /= scale_x;
+                    t_height /= scale_y;
 
-                        if (mouse_clicked) {
-                            browser_start_loading(link.link, page,
-                                                  scroll_margin,
-                                                  desired_width, scale_x);
+                    SDL_Rect dst_rect = {0};
+                    dst_rect.x = (width - t_width) / 2;
+                    dst_rect.y = scroll;
+                    dst_rect.w = t_width;
+                    dst_rect.h = content_height = t_height;
+                    SDL_RenderCopy(renderer, page->texture, NULL, &dst_rect);
+
+                    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_MOD);
+                    int links_count = sb_count(page->interactable.links);
+                    for (int i = 0; i < links_count; i++) {
+                        struct link_box link = page->interactable.links[i];
+                        SDL_Rect link_rect = {0};
+                        link_rect.x = link.rect.x + dst_rect.x;
+                        link_rect.y = link.rect.y + dst_rect.y;
+                        link_rect.w = link.rect.w;
+                        link_rect.h = link.rect.h;
+                        if (SDL_PointInRect(&mouse, &link_rect)) {
+                            current_cursor = cursor_hand;
+
+                            if (mouse_held) {
+                                SDL_SetRenderDrawColor(renderer,
+                                                       0xFF, 0xEE, 0xDD, 0xFF);
+                                SDL_RenderFillRect(renderer, &link_rect);
+                            } else {
+                                SDL_SetRenderDrawColor(renderer,
+                                                       0xEE, 0xEE, 0xFF, 0xFF);
+                                SDL_RenderFillRect(renderer, &link_rect);
+                            }
+
+                            if (mouse_clicked) {
+                                browser_start_loading(link.link, page,
+                                                      scroll_margin,
+                                                      desired_width, scale_x);
+                            }
                         }
                     }
+                    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
                 }
-                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-            }
-        }
-
-        if (page->status != LOADING_DONE) {
-            bool is_err = page->error != ERR_NONE;
-            if (is_err) {
-                current_cursor = cursor_arrow;
-
-                char str[1024];
-                SDL_snprintf(str, 1024, "Error: %s",
-                             get_nemini_err_str(page->error));
-                SDL_Texture *err_tex;
-                err_tex = text_cached_render(renderer, str, scale_x);
-                Uint32 t_format;
-                int t_access, t_width, t_height;
-                SDL_QueryTexture(err_tex, &t_format, &t_access,
-                                 &t_width, &t_height);
-                t_width /= scale_x;
-                t_height /= scale_y;
-                SDL_Rect dst_rect = {0};
-                dst_rect.x = (width - t_width) / 2;
-                dst_rect.y = scroll;
-                dst_rect.w = t_width;
-                dst_rect.h = content_height = t_height;
-                SDL_SetRenderDrawColor(renderer, bg_r, bg_g, bg_b, 0xFF);
-                SDL_RenderFillRect(renderer, &dst_rect);
-                SDL_RenderCopy(renderer, err_tex, NULL, &dst_rect);
-
-                SDL_SetRenderDrawColor(renderer, 0xDD, 0x33, 0x33, 0xBB);
-            } else {
-                SDL_SetRenderDrawColor(renderer, 0x55, 0xAA, 0x55, 0xBB);
             }
 
-            SDL_Rect loading_rect = {0};
-            loading_rect.x = 0;
-            loading_rect.y = 0;
-            if (is_err) {
-                loading_rect.w = width;
-            } else {
-                float target = width * (int)page->status / (LOADING_DONE - 1);
-                loading_bar_width = lerp(loading_bar_width, target,
-                                         7.5 * dt);
-                loading_rect.w = loading_bar_width;
+            if (page->status != LOADING_DONE) {
+                bool is_err = page->error != ERR_NONE;
+                if (is_err) {
+                    current_cursor = cursor_arrow;
+
+                    char str[1024];
+                    SDL_snprintf(str, 1024, "Error: %s",
+                                 get_nemini_err_str(page->error));
+                    SDL_Texture *err_tex;
+                    err_tex = text_cached_render(renderer, str, scale_x);
+                    Uint32 t_format;
+                    int t_access, t_width, t_height;
+                    SDL_QueryTexture(err_tex, &t_format, &t_access,
+                                     &t_width, &t_height);
+                    t_width /= scale_x;
+                    t_height /= scale_y;
+                    SDL_Rect dst_rect = {0};
+                    dst_rect.x = (width - t_width) / 2;
+                    dst_rect.y = scroll;
+                    dst_rect.w = t_width;
+                    dst_rect.h = content_height = t_height;
+                    SDL_SetRenderDrawColor(renderer, bg_r, bg_g, bg_b, 0xFF);
+                    SDL_RenderFillRect(renderer, &dst_rect);
+                    SDL_RenderCopy(renderer, err_tex, NULL, &dst_rect);
+
+                    SDL_SetRenderDrawColor(renderer, 0xDD, 0x33, 0x33, 0xBB);
+                } else {
+                    SDL_SetRenderDrawColor(renderer, 0x55, 0xAA, 0x55, 0xBB);
+                }
+
+                SDL_Rect loading_rect = {0};
+                loading_rect.x = 0;
+                loading_rect.y = 0;
+                if (is_err) {
+                    loading_rect.w = width;
+                } else {
+                    float target = width * (int)page->status / (LOADING_DONE - 1);
+                    loading_bar_width = lerp(loading_bar_width, target,
+                                             7.5 * dt);
+                    loading_rect.w = loading_bar_width;
+                }
+                loading_rect.h = 8;
+                SDL_RenderFillRect(renderer, &loading_rect);
             }
-            loading_rect.h = 8;
-            SDL_RenderFillRect(renderer, &loading_rect);
         }
 
         SDL_SetCursor(current_cursor);

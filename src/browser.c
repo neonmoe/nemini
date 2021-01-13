@@ -162,6 +162,15 @@ struct loaded_page *browser_get_page(void) {
     return (struct loaded_page *)SDL_TLSGet(tls_current_page);
 }
 
+struct loaded_page *browser_get_root(struct loaded_page *page) {
+    // TODO: Figure out why the next line is segfaulting
+    if (page == NULL || page->parent == NULL) {
+        return page;
+    } else {
+        return browser_get_root(page->parent);
+    }
+}
+
 void browser_init(void) {
     tls_current_page = SDL_TLSCreate();
 }

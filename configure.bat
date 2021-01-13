@@ -21,7 +21,7 @@ if exist Makefile (del Makefile)
 echo OUTDIR=build-windows-x86>>Makefile
 echo EXE=nemini.exe>>Makefile
 echo BITS=x86>>Makefile
-echo OBJS=src\main.obj src\net.obj src\socket.obj src\url.obj src\error.obj src\gemini.obj src\text.obj src\str.obj src\browser.obj>>Makefile
+echo OBJS=src\main.obj src\net.obj src\socket.obj src\url.obj src\error.obj src\gemini.obj src\text.obj src\str.obj src\browser.obj src\tree_renderer.obj>>Makefile
 echo CFLAGS=/Iinclude /TC /O2 /GS /guard:cf /nologo>> Makefile
 echo LIBS=/link /DEBUG:FULL /subsystem:windows /nologo lib\$(BITS)\SDL2main.lib lib\$(BITS)\SDL2.lib lib\$(BITS)\*crypto*.lib lib\$(BITS)\*ssl*.lib shell32.lib Ws2_32.lib>>Makefile
 echo OUTFLAG=/Fe>>Makefile

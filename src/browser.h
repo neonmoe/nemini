@@ -47,6 +47,7 @@ enum nemini_error browser_start_loading(const char *url,
 void browser_redraw_page(struct loaded_page *page, int page_width,
                          float page_scale);
 struct loaded_page *browser_get_page(void);
+struct loaded_page *browser_get_root(struct loaded_page *page);
 void browser_init(void);
 void browser_free(void);
 
