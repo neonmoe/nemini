@@ -138,6 +138,8 @@ int main(int argc, char **argv) {
     // Delta-time: how long the previous frame lasted.
     float dt = 1.0 / refresh_rate;
     while (running) {
+        struct loaded_page *page = browser_get_page();
+
         Uint32 frame_start_ms = SDL_GetTicks();
         mouse_clicked = false;
         float scroll_delta = 0;
@@ -161,6 +163,39 @@ int main(int argc, char **argv) {
                 get_scale(window, renderer, &scale, NULL);
                 float line_height = text_line_height(scale);
                 scroll_delta += event.wheel.y * line_height * 3;
+            } else if (event.type == SDL_KEYDOWN) {
+                switch (event.key.keysym.sym) {
+                case SDLK_UP: {
+                    float scale = 0;
+                    get_scale(window, renderer, &scale, NULL);
+                    float line_height = text_line_height(scale);
+                    scroll_delta += line_height * 6;
+                } break;
+                case SDLK_DOWN: {
+                    float scale = 0;
+                    get_scale(window, renderer, &scale, NULL);
+                    float line_height = text_line_height(scale);
+                    scroll_delta -= line_height * 6;
+                } break;
+                case SDLK_PAGEUP: {
+                    int width, height;
+                    SDL_GetRendererOutputSize(renderer, &width, &height);
+                    scroll_delta += height;
+                } break;
+                case SDLK_PAGEDOWN: {
+                    int width, height;
+                    SDL_GetRendererOutputSize(renderer, &width, &height);
+                    scroll_delta -= height;
+                } break;
+                case SDLK_HOME: {
+                    page->rendered_scroll = scroll_margin;
+                } break;
+                case SDLK_END: {
+                    int width, height;
+                    SDL_GetRendererOutputSize(renderer, &width, &height);
+                    page->rendered_scroll = height - content_height - scroll_margin;
+                } break;
+                }
             }
         }
         if (!running) {
@@ -181,7 +216,6 @@ int main(int argc, char **argv) {
         SDL_SetRenderDrawColor(renderer, bg_r, bg_g, bg_b, 0xFF);
         SDL_RenderClear(renderer);
 
-        struct loaded_page *page = browser_get_page();
         SDL_Cursor *current_cursor = cursor_arrow;
         if (page->status != LOADING_DONE) {
             current_cursor = cursor_wait;
